@@ -62,10 +62,12 @@ class CategoryBudgetProgress {
 class MonthlyBudgetSummary {
   final int yearMonth;
   final List<CategoryBudgetProgress> categoryProgresses;
+  final String cycleLabel;
 
   const MonthlyBudgetSummary({
     required this.yearMonth,
     required this.categoryProgresses,
+    this.cycleLabel = '',
   });
 
   VndMoney get totalLimitVnd => categoryProgresses.fold(
@@ -141,10 +143,12 @@ class CategoryBudgetTracker {
   static MonthlyBudgetSummary evaluateSummary({
     required int yearMonth,
     required List<CategoryBudgetProgress> categoryProgresses,
+    String cycleLabel = '',
   }) {
     return MonthlyBudgetSummary(
       yearMonth: yearMonth,
       categoryProgresses: categoryProgresses,
+      cycleLabel: cycleLabel,
     );
   }
 }

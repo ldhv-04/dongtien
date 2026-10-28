@@ -60,6 +60,17 @@ class CategoryBudgetsView extends ConsumerWidget {
                       ),
                     ],
                   ),
+                  if (summary.cycleLabel.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      'Chu kỳ: ${summary.cycleLabel}',
+                      style: VndFormatter.withTabularFigures(
+                        AppTypography.caption.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
                   Text(
                     'Đã chi: ${VndFormatter.formatMoney(summary.totalSpentVnd)} / ${VndFormatter.formatMoney(summary.totalLimitVnd)}',
                     style: VndFormatter.withTabularFigures(
@@ -178,6 +189,50 @@ class CategoryBudgetsView extends ConsumerWidget {
                                 ),
                               ],
                             ),
+                            AppSpacing.gapH8,
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                Semantics(
+                                  identifier:
+                                      'btn_edit_budget_${prog.categoryId}',
+                                  button: true,
+                                  child: TextButton.icon(
+                                    icon: const Icon(Icons.edit_outlined,
+                                        size: 16),
+                                    label: const Text('Sửa'),
+                                    onPressed: () => _openSetBudgetSheet(
+                                      context,
+                                      prog.categoryId,
+                                      prog.categoryName,
+                                      initialLimit: prog.limitVnd.amount,
+                                    ),
+                                  ),
+                                ),
+                                AppSpacing.gapW8,
+                                Semantics(
+                                  identifier:
+                                      'btn_delete_budget_${prog.categoryId}',
+                                  button: true,
+                                  child: TextButton.icon(
+                                    icon: const Icon(Icons.delete_outline,
+                                        size: 16,
+                                        color: AppColors.textAccentRubyPrimary),
+                                    label: const Text('Xóa',
+                                        style: TextStyle(
+                                            color: AppColors
+                                                .textAccentRubyPrimary)),
+                                    onPressed: () => _confirmAndDeleteBudget(
+                                      context,
+                                      ref,
+                                      prog.categoryId,
+                                      prog.categoryName,
+                                      prog.yearMonth,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ],
                         ),
                       ),
@@ -192,6 +247,44 @@ class CategoryBudgetsView extends ConsumerWidget {
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (err, _) => Center(child: Text('Lỗi: $err')),
     );
+  }
+
+  Future<void> _confirmAndDeleteBudget(
+    BuildContext context,
+    WidgetRef ref,
+    int categoryId,
+    String categoryName,
+    int yearMonth,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Xác nhận xóa ngân sách'),
+        content: Text(
+          'Bạn có chắc chắn muốn xóa ngân sách cho danh mục "$categoryName"? Lịch sử chi tiêu thực tế trong sổ cái vẫn được bảo toàn nguyên vẹn.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.fillAccentRubyPrimary,
+              foregroundColor: AppColors.textInverse,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Xóa'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      await ref
+          .read(plansControllerProvider.notifier)
+          .deleteCategoryBudget(categoryId: categoryId, yearMonth: yearMonth);
+    }
   }
 
   void _openSetBudgetSheet(
@@ -231,6 +324,7 @@ class _SetBudgetModal extends ConsumerStatefulWidget {
 class _SetBudgetModalState extends ConsumerState<_SetBudgetModal> {
   late int _selectedCategoryId;
   late int _limitVnd;
+  bool _isSubmitting = false;
 
   @override
   void initState() {
@@ -288,6 +382,8 @@ class _SetBudgetModalState extends ConsumerState<_SetBudgetModal> {
               },
               onBackspacePressed: () => setState(() => _limitVnd ~/= 10),
               onDonePressed: _submit,
+              isSubmitting: _isSubmitting,
+              isDoneEnabled: _limitVnd > 0,
             ),
             AppSpacing.gapH8,
             ElevatedButton(
@@ -295,21 +391,79 @@ class _SetBudgetModalState extends ConsumerState<_SetBudgetModal> {
                 backgroundColor: AppColors.fillAccentVerdantPrimary,
                 foregroundColor: AppColors.textInverse,
               ),
-              onPressed: _limitVnd <= 0 ? null : _submit,
+              onPressed: (_limitVnd <= 0 || _isSubmitting) ? null : _submit,
               child: const Text('Lưu hạn mức'),
             ),
+            if (widget.initialLimitVnd > 0) ...[
+              AppSpacing.gapH8,
+              Semantics(
+                identifier: 'btn_delete_budget_$_selectedCategoryId',
+                button: true,
+                child: TextButton.icon(
+                  icon: const Icon(Icons.delete_outline,
+                      color: AppColors.textAccentRubyPrimary),
+                  label: const Text('Xóa ngân sách này',
+                      style: TextStyle(color: AppColors.textAccentRubyPrimary)),
+                  onPressed: _isSubmitting ? null : _confirmAndDelete,
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
   }
 
+  Future<void> _confirmAndDelete() async {
+    final nav = Navigator.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Xác nhận xóa ngân sách'),
+        content: Text(
+          'Bạn có chắc chắn muốn xóa ngân sách cho danh mục "${widget.initialCategoryName}"? Lịch sử chi tiêu thực tế trong sổ cái vẫn được bảo toàn nguyên vẹn.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.fillAccentRubyPrimary,
+              foregroundColor: AppColors.textInverse,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Xóa'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      setState(() => _isSubmitting = true);
+      try {
+        await ref.read(plansControllerProvider.notifier).deleteCategoryBudget(
+              categoryId: _selectedCategoryId,
+            );
+        if (mounted) nav.pop();
+      } finally {
+        if (mounted) setState(() => _isSubmitting = false);
+      }
+    }
+  }
+
   Future<void> _submit() async {
-    if (_limitVnd <= 0) return;
-    await ref.read(plansControllerProvider.notifier).upsertCategoryBudget(
-          categoryId: _selectedCategoryId,
-          limitVnd: _limitVnd,
-        );
-    if (mounted) Navigator.of(context).pop();
+    if (_isSubmitting || _limitVnd <= 0) return;
+    setState(() => _isSubmitting = true);
+    try {
+      await ref.read(plansControllerProvider.notifier).upsertCategoryBudget(
+            categoryId: _selectedCategoryId,
+            limitVnd: _limitVnd,
+          );
+      if (mounted) Navigator.of(context).pop();
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 }

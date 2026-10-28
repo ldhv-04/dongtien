@@ -1,55 +1,42 @@
-# BRIEFING — 2026-10-27T17:46:00Z
+# BRIEFING — 2026-10-28T18:41:00Z
 
 ## Mission
-Investigate Drift database seeding logic (`MigrationStrategy.onCreate`) and in-memory database testing architecture (`test/database/app_database_test.dart`) for Milestone M1.
+Investigate and design R3: Synchronize `periodStartDay` across Dashboard, Plans, Notifications, and Reports via a pure domain `BillingCycleCalculator`.
 
 ## 🔒 My Identity
 - Archetype: explorer
-- Roles: Database Seeding & In-Memory Test Explorer
+- Roles: investigator, synthesis
 - Working directory: c:\Users\coihu12\Documents\App\.agents\teamwork\explorer_m1_3
-- Original parent: 4b707e3a-5355-44d8-b48d-d32bbd3220b1
-- Milestone: M1 (Scaffold & Drift Database Schema)
+- Original parent: b3a0cd18-f6b1-42d4-9173-c648bf560f2f
+- Milestone: M1_R3_Investigation
 
 ## 🔒 Key Constraints
-- Read-only investigation — do NOT implement directly in source code
-- Zero remote dependencies, offline-first
-- Whole VND 64-bit integer, zero float
-- Drift schema adherence, PRAGMA foreign_keys = ON;
-- Initial balances strictly 0 ₫, zero fake transactions
-- System accounts: EQUITY_OPENING, default Income, default Expense
-- 8 default Vietnamese categories with icon codes and colors
-- Double-entry journal invariant: sum(debit) == sum(credit)
-- Write only to .agents/teamwork/explorer_m1_3/
+- Read-only investigation — do NOT implement source code
+- Zero floating-point currency; VndMoney 64-bit integer
+- Clean architecture boundaries: domain pure Dart, zero Flutter/Drift imports
+- Single Source of Truth for Billing Cycle Window (periodStartDay 1..28)
+- No hardcoded DateTime(now.year, now.month, 1)
 
 ## Current Parent
-- Conversation ID: 4b707e3a-5355-44d8-b48d-d32bbd3220b1
-- Updated: not yet
+- Conversation ID: b3a0cd18-f6b1-42d4-9173-c648bf560f2f
+- Updated: 2026-10-28T18:40:10Z
 
 ## Investigation State
-- **Explored paths**:
-  - `build_spec/dongtien_build_spec.md` (§4.2, §4.3, §4.4)
-  - `docs/ARCHITECTURE_AND_RULES.md` (§1, §2, §3, §4, §10, §11)
-  - `docs/DESIGN_AND_TEST_PLAN.md` (§1.3, §1.5, §5)
-  - `.agents/teamwork/orchestrator_1/PROJECT.md` (Features 18, 19)
-  - `test_sqlite_simulation.py` (verified 100% of SQLite constraints and seeding via Python)
+- **Explored paths**: `lib/core/database/app_database.dart`, `lib/features/reports_settings/`, `lib/features/dashboard/`, `lib/features/plans/`, `lib/core/notifications/`, `lib/domain/budgeting/`, `test/`
 - **Key findings**:
-  - Seed 3 system accounts in `ledger_accounts`: `EQUITY_OPENING` (`kind = 'EQUITY_OPENING'`), default Income (`kind = 'INCOME'`), default Expense (`kind = 'EXPENSE'`) with `is_liquid = false`, `credit_limit = 0`.
-  - Seed 8 Vietnamese categories with icons & colors: 2 Income (`Lương`, `Thưởng`), 6 Expense (`Ăn uống`, `Di chuyển`, `Hoá đơn & Tiện ích`, `Nhà cửa`, `Mua sắm`, `Y tế`).
-  - Seed singleton row in `settings` (`id = 1`).
-  - Initial balances are strictly 0 ₫ derived from 0 postings. Zero fake transactions.
-  - Foreign key enforcement via `PRAGMA foreign_keys = ON;` in `MigrationStrategy.beforeOpen` and in `NativeDatabase.memory(setup: ...)`.
-  - Comprehensive 4-group in-memory test suite designed for `test/database/app_database_test.dart`.
-- **Unexplored areas**: None for M1 seeding and database test scope.
+  1. Identified all 6 locations hardcoding `DateTime(now.year, now.month, 1)` and `now.year * 100 + now.month`.
+  2. Bounding `periodStartDay` strictly to `1..28` guarantees no missing-day drift in February (leap or non-leap).
+  3. Budget lookup must query `b.year_month IN (activeCycleYearMonth, calendarYearMonth)` and deduplicate in Dart preferring `activeCycleYearMonth` so existing user budgets remain visible when changing `periodStartDay`.
+  4. Reactive watch on `settingsStreamProvider` + inclusion of `db.settings` in Drift's `readsFrom` set guarantees instant UI updates upon setting changes.
+- **Unexplored areas**: None. Complete investigation of all providers, services, models, and UI widgets finished.
 
 ## Key Decisions Made
-- Confirmed topological seeding order: `ledger_accounts` -> `categories` -> `settings`.
-- Established exact Material Icon codepoints and semantic hex colors for the 8 categories.
-- Validated SQLite CHECK constraint `(debit > 0 AND credit == 0) OR (credit > 0 AND debit == 0)`.
-- Verified in-memory SQLite simulation script exits 0 with all constraints passing.
+- Designed pure Dart `BillingCycleCalculator` and `BillingCycle` value object (zero Flutter/Drift imports).
+- Extended `MonthlyBudgetSummary` with optional `cycleLabel` for backward-compatible card rendering.
+- Formatted `reportPeriodLabel` for synchronized header in Reports screen.
+- Verified test suite passes 100% (308 tests).
 
 ## Artifact Index
-- DISPATCH.md — incoming dispatch instructions
-- BRIEFING.md — persistent situational awareness
-- progress.md — liveness heartbeat
-- test_sqlite_simulation.py — working verification script for SQLite schema invariants
-- handoff.md — final 5-component report
+- c:\Users\coihu12\Documents\App\.agents\teamwork\explorer_m1_3\DISPATCH.md — Incoming dispatch message
+- c:\Users\coihu12\Documents\App\.agents\teamwork\explorer_m1_3\progress.md — Liveness heartbeat & step status
+- c:\Users\coihu12\Documents\App\.agents\teamwork\explorer_m1_3\handoff.md — Complete 5-component handoff report

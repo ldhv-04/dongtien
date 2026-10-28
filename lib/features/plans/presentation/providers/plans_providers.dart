@@ -3,10 +3,11 @@ import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/money/vnd_money.dart';
+import '../../../../core/notifications/notification_scheduler.dart';
+import '../../../../domain/budgeting/billing_cycle_calculator.dart';
 import '../../../../domain/budgeting/feasibility_advisor.dart';
 import '../../../../domain/budgeting/goal_calculator.dart';
 import '../../../../domain/forecasting/cash_flow_forecaster.dart';
-import '../../../../domain/forecasting/recurrence_calculator.dart';
 import '../../../../domain/ledger/account_kind.dart';
 import '../../../../domain/ledger/post_transaction_command.dart';
 import '../../../../domain/ledger/posting_matrix.dart';
@@ -137,7 +138,14 @@ class PlansController extends AsyncNotifier<void> {
     try {
       final db = ref.read(databaseProvider);
       final now = DateTime.now();
-      final ym = yearMonth ?? (now.year * 100 + now.month);
+      int ym = yearMonth ?? 0;
+      if (yearMonth == null) {
+        final settings = await (db.select(db.settings)
+              ..where((s) => s.id.equals(1)))
+            .getSingleOrNull();
+        final periodStartDay = (settings?.periodStartDay ?? 1).clamp(1, 28);
+        ym = BillingCycleCalculator.calculate(now, periodStartDay).yearMonth;
+      }
 
       final existing = await (db.select(db.categoryBudgets)
             ..where((b) =>
@@ -163,6 +171,75 @@ class PlansController extends AsyncNotifier<void> {
               ),
             );
       }
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      rethrow;
+    }
+  }
+
+  /// Deletes a monthly category budget limit.
+  Future<void> deleteCategoryBudget({
+    required int categoryId,
+    int? yearMonth,
+  }) async {
+    state = const AsyncValue.loading();
+    try {
+      final db = ref.read(databaseProvider);
+      final now = DateTime.now();
+      int ym = yearMonth ?? 0;
+      if (yearMonth == null) {
+        final settings = await (db.select(db.settings)
+              ..where((s) => s.id.equals(1)))
+            .getSingleOrNull();
+        final periodStartDay = (settings?.periodStartDay ?? 1).clamp(1, 28);
+        ym = BillingCycleCalculator.calculate(now, periodStartDay).yearMonth;
+      }
+
+      await (db.delete(db.categoryBudgets)
+            ..where((b) =>
+                b.categoryId.equals(categoryId) & b.yearMonth.equals(ym)))
+          .go();
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      rethrow;
+    }
+  }
+
+  /// Deletes a savings goal envelope.
+  /// If reserved balance > 0, releases the balance back to liquid cash (available-to-allocate)
+  /// before archiving the envelope and clearing its target amount.
+  Future<void> deleteSavingsGoal(int envelopeId) async {
+    state = const AsyncValue.loading();
+    try {
+      final db = ref.read(databaseProvider);
+      final envelopeDao = ref.read(envelopeDaoProvider);
+
+      await db.transaction(() async {
+        final env = await (db.select(db.envelopes)
+              ..where((e) => e.id.equals(envelopeId)))
+            .getSingle();
+
+        // 1. Release reserved balance back to Available-to-Allocate if positive
+        if (env.reservedBalanceVnd > 0) {
+          await envelopeDao.release(
+            envelopeId: envelopeId,
+            amountVnd: env.reservedBalanceVnd,
+          );
+        }
+
+        // 2. Archive envelope and reset target to null (decouples from feasibility advisor)
+        await (db.update(db.envelopes)..where((e) => e.id.equals(envelopeId)))
+            .write(
+          const EnvelopesCompanion(
+            isArchived: Value(true),
+            targetAmountVnd: Value(null),
+            targetDateMs: Value(null),
+          ),
+        );
+      });
+
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -278,7 +355,7 @@ class PlansController extends AsyncNotifier<void> {
               title: title,
               amountVnd: amountVnd,
               dueDateMs: dueDate.millisecondsSinceEpoch,
-              recurrence: Value(recurrence),
+              recurrence: const Value('NONE'),
               anchorDayOfMonth: Value(anchorDayOfMonth ?? dueDate.day),
               categoryId: Value(categoryId),
               linkedEnvelopeId: Value(linkedEnvelopeId),
@@ -286,8 +363,284 @@ class PlansController extends AsyncNotifier<void> {
               reminderDaysBefore: Value(reminderDaysBefore),
             ),
           );
+      if (kind == 'BILL') {
+        final scheduler = ref.read(notificationSchedulerProvider);
+        await scheduler.reconcileFromDatabase(db);
+      }
       state = const AsyncValue.data(null);
       return id;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      rethrow;
+    }
+  }
+
+  /// Deletes a scheduled item.
+  /// If status is PAID_OR_RECEIVED, atomically voids and reverses the linked
+  /// journal transaction via LedgerDao.voidTransaction (inverting postings and
+  /// restoring any linked envelope SPEND balance) before deleting the scheduled item.
+  Future<void> deleteScheduledItem(int scheduledItemId) async {
+    state = const AsyncValue.loading();
+    try {
+      final db = ref.read(databaseProvider);
+      final dao = ref.read(ledgerDaoProvider);
+
+      await db.transaction(() async {
+        final item = await (db.select(db.scheduledItems)
+              ..where((s) => s.id.equals(scheduledItemId)))
+            .getSingleOrNull();
+
+        if (item == null) return;
+
+        // 1. If paid/received, void the ledger transaction
+        if (item.status == 'PAID_OR_RECEIVED' &&
+            item.paidTransactionId != null) {
+          final tx = await (db.select(db.journalTransactions)
+                ..where((t) => t.id.equals(item.paidTransactionId!)))
+              .getSingleOrNull();
+          if (tx != null && tx.status == 'POSTED') {
+            await dao.voidTransaction(item.paidTransactionId!);
+          }
+        }
+
+        // 2. Delete the scheduled item row
+        await (db.delete(db.scheduledItems)
+              ..where((s) => s.id.equals(scheduledItemId)))
+            .go();
+      });
+
+      // 3. Reconcile notifications
+      final scheduler = ref.read(notificationSchedulerProvider);
+      await scheduler.reconcileFromDatabase(db);
+
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      rethrow;
+    }
+  }
+
+  /// Updates an existing scheduled item.
+  /// If status is PENDING, simply updates the scheduled item record.
+  /// If status is PAID_OR_RECEIVED, atomically:
+  ///   1. Voids old paidTransactionId via LedgerDao.voidTransaction.
+  ///   2. Posts the updated transaction with new amount/category/envelope and fresh idempotency key.
+  ///   3. Updates scheduled item record with new values and new paidTransactionId.
+  Future<void> updateScheduledItem({
+    required int scheduledItemId,
+    required String kind,
+    required String title,
+    required int amountVnd,
+    required DateTime dueDate,
+    int? categoryId,
+    int? linkedEnvelopeId,
+    int reminderDaysBefore = 1,
+  }) async {
+    state = const AsyncValue.loading();
+    try {
+      final db = ref.read(databaseProvider);
+      final dao = ref.read(ledgerDaoProvider);
+
+      int? alertCategoryId;
+
+      await db.transaction(() async {
+        final item = await (db.select(db.scheduledItems)
+              ..where((s) => s.id.equals(scheduledItemId)))
+            .getSingle();
+
+        int? newPaidTxId = item.paidTransactionId;
+
+        if (item.status == 'PAID_OR_RECEIVED') {
+          // Step 1: Void the old transaction if POSTED
+          if (item.paidTransactionId != null) {
+            final oldTx = await (db.select(db.journalTransactions)
+                  ..where((t) => t.id.equals(item.paidTransactionId!)))
+                .getSingleOrNull();
+            if (oldTx != null && oldTx.status == 'POSTED') {
+              await dao.voidTransaction(item.paidTransactionId!);
+            }
+          }
+
+          // Step 2: Determine account used in original transaction or fallback to liquid account
+          int targetAccountId = 0;
+          if (item.paidTransactionId != null) {
+            final oldPostings = await (db.select(db.journalPostings)
+                  ..where(
+                      (p) => p.transactionId.equals(item.paidTransactionId!)))
+                .get();
+            final assetLeg = oldPostings.cast<JournalPosting?>().firstWhere(
+                  (p) => kind == 'BILL' ? p!.creditVnd > 0 : p!.debitVnd > 0,
+                  orElse: () => null,
+                );
+            if (assetLeg != null) {
+              targetAccountId = assetLeg.accountId;
+            }
+          }
+          if (targetAccountId == 0) {
+            final accounts = await dao.getAccountsWithBalances();
+            final liquid = accounts.where((a) => a.isLiquid).toList();
+            targetAccountId = liquid.isNotEmpty ? liquid.first.id : 1;
+          }
+
+          // Step 3: Resolve category with strict isolation
+          int targetCategoryId = 0;
+          if (categoryId != null && categoryId > 0) {
+            final existingCat = await (db.select(db.categories)
+                  ..where((c) => c.id.equals(categoryId)))
+                .getSingleOrNull();
+            if (existingCat != null) {
+              targetCategoryId = existingCat.id;
+            }
+          }
+          if (targetCategoryId == 0 &&
+              item.categoryId != null &&
+              item.categoryId! > 0) {
+            final existingCat = await (db.select(db.categories)
+                  ..where((c) => c.id.equals(item.categoryId!)))
+                .getSingleOrNull();
+            if (existingCat != null) {
+              targetCategoryId = existingCat.id;
+            }
+          }
+
+          if (targetCategoryId == 0) {
+            final cats = await (db.select(db.categories)
+                  ..where((c) => c.kind
+                      .equals(kind == 'PLANNED_INCOME' ? 'INCOME' : 'EXPENSE')))
+                .get();
+            if (kind == 'BILL') {
+              final defaultCat = cats.cast<Category?>().firstWhere(
+                    (c) => c!.name == 'Hoá đơn & Tiện ích',
+                    orElse: () => cats.cast<Category?>().firstWhere(
+                      (c) => c!.name == 'Nhà cửa',
+                      orElse: () {
+                        final nonFood =
+                            cats.where((c) => c.name != 'Ăn uống').toList();
+                        return nonFood.isNotEmpty
+                            ? nonFood.first
+                            : (cats.isNotEmpty ? cats.first : null);
+                      },
+                    ),
+                  );
+              targetCategoryId = defaultCat?.id ?? 1;
+            } else {
+              final defaultCat = cats.cast<Category?>().firstWhere(
+                    (c) => c!.name == 'Lương',
+                    orElse: () => cats.cast<Category?>().firstWhere(
+                          (c) => c!.name == 'Thưởng',
+                          orElse: () => cats.isNotEmpty ? cats.first : null,
+                        ),
+                  );
+              targetCategoryId = defaultCat?.id ?? 1;
+            }
+          }
+
+          if (kind == 'BILL') {
+            alertCategoryId = targetCategoryId;
+          }
+
+          // Step 4: Post new replacement transaction
+          final nowMs = DateTime.now().millisecondsSinceEpoch;
+          final revKey = 'scheduled_pay_${item.id}_rev_$nowMs';
+
+          if (kind == 'PLANNED_INCOME') {
+            newPaidTxId = await dao.postTransactionCommand(
+              PostTransactionCommand.income(
+                receivingAssetAccountId: targetAccountId,
+                categoryId: targetCategoryId,
+                amountVnd: amountVnd,
+                occurredAt: nowMs,
+                description: title,
+                idempotencyKey: revKey,
+              ),
+            );
+          } else {
+            // BILL
+            int? envelopeToLink = linkedEnvelopeId;
+            int partialEnvelopeSpend = 0;
+            if (envelopeToLink != null) {
+              final env = await (db.select(db.envelopes)
+                    ..where((e) => e.id.equals(envelopeToLink!)))
+                  .getSingleOrNull();
+              if (env != null) {
+                if (env.reservedBalanceVnd >= amountVnd ||
+                    env.allowNegativeException) {
+                  partialEnvelopeSpend = 0;
+                } else {
+                  partialEnvelopeSpend = math.max(0, env.reservedBalanceVnd);
+                  envelopeToLink = null;
+                }
+              } else {
+                envelopeToLink = null;
+              }
+            }
+
+            newPaidTxId = await dao.postTransaction(
+              txType: 'EXPENSE',
+              description: title,
+              occurredAt: nowMs,
+              postings: PostingMatrix.buildExpense(
+                sourceAccountId: targetAccountId,
+                categoryId: targetCategoryId,
+                amountVnd: amountVnd,
+                envelopeId: envelopeToLink ?? linkedEnvelopeId,
+              ),
+              idempotencyKey: revKey,
+              linkedEnvelopeId: envelopeToLink,
+              envelopeMovementType: envelopeToLink != null ? 'SPEND' : null,
+            );
+
+            if (partialEnvelopeSpend > 0 && linkedEnvelopeId != null) {
+              await db.into(db.envelopeMovements).insert(
+                    EnvelopeMovementsCompanion.insert(
+                      movementType: 'SPEND',
+                      amountVnd: partialEnvelopeSpend,
+                      sourceEnvelopeId: Value(linkedEnvelopeId),
+                      linkedTransactionId: Value(newPaidTxId),
+                      linkedObligationId: Value(item.id),
+                      occurredAt: nowMs,
+                    ),
+                  );
+              await db.customUpdate(
+                'UPDATE envelopes SET reserved_balance_vnd = reserved_balance_vnd - ? WHERE id = ?',
+                variables: [
+                  Variable.withInt(partialEnvelopeSpend),
+                  Variable.withInt(linkedEnvelopeId),
+                ],
+                updates: {db.envelopes},
+              );
+            }
+          }
+        }
+
+        // Step 5: Update scheduled item record
+        await (db.update(db.scheduledItems)..where((s) => s.id.equals(item.id)))
+            .write(
+          ScheduledItemsCompanion(
+            title: Value(title),
+            kind: Value(kind),
+            amountVnd: Value(amountVnd),
+            dueDateMs: Value(dueDate.millisecondsSinceEpoch),
+            anchorDayOfMonth: Value(dueDate.day),
+            categoryId: Value(categoryId),
+            linkedEnvelopeId: Value(linkedEnvelopeId),
+            paidTransactionId: Value(newPaidTxId),
+            reminderDaysBefore: Value(reminderDaysBefore),
+          ),
+        );
+      });
+
+      // Step 6: Reconcile notifications and threshold alerts
+      final scheduler = ref.read(notificationSchedulerProvider);
+      await scheduler.reconcileFromDatabase(db);
+      if (alertCategoryId != null) {
+        await scheduler.checkCategoryBudgetAlert(
+          db: db,
+          categoryId: alertCategoryId!,
+        );
+      }
+
+      state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
       rethrow;
@@ -305,6 +658,7 @@ class PlansController extends AsyncNotifier<void> {
       final db = ref.read(databaseProvider);
       final dao = ref.read(ledgerDaoProvider);
 
+      int? alertCategoryId;
       final txId = await db.transaction(() async {
         final item = await (db.select(db.scheduledItems)
               ..where((s) => s.id.equals(scheduledItemId)))
@@ -334,17 +688,65 @@ class PlansController extends AsyncNotifier<void> {
           }
         }
 
-        // Resolve category
-        int targetCategoryId = item.categoryId ?? 0;
+        // Resolve category with strict isolation (Option B)
+        int targetCategoryId = 0;
+        if (item.categoryId != null && item.categoryId! > 0) {
+          final existingCat = await (db.select(db.categories)
+                ..where((c) => c.id.equals(item.categoryId!)))
+              .getSingleOrNull();
+          if (existingCat != null) {
+            targetCategoryId = existingCat.id;
+          }
+        }
+
         if (targetCategoryId == 0) {
+          final isBill = item.kind == 'BILL';
+          final desiredKind = isBill ? 'EXPENSE' : 'INCOME';
           final cats = await (db.select(db.categories)
-                ..where((c) => c.kind.equals(
-                    item.kind == 'PLANNED_INCOME' ? 'INCOME' : 'EXPENSE')))
+                ..where((c) => c.kind.equals(desiredKind)))
               .get();
-          targetCategoryId = cats.isNotEmpty ? cats.first.id : 1;
+
+          if (isBill) {
+            // Default legacy/null bill category:
+            // 1. 'Hoá đơn & Tiện ích'
+            // 2. 'Nhà cửa'
+            // 3. Any non-food expense category if available
+            // 4. NEVER cats.first ('Ăn uống') unless it is the only category in db
+            final defaultBillCat = cats.cast<Category?>().firstWhere(
+                  (c) => c!.name == 'Hoá đơn & Tiện ích',
+                  orElse: () => cats.cast<Category?>().firstWhere(
+                    (c) => c!.name == 'Nhà cửa',
+                    orElse: () {
+                      final nonFood =
+                          cats.where((c) => c.name != 'Ăn uống').toList();
+                      return nonFood.isNotEmpty
+                          ? nonFood.first
+                          : (cats.isNotEmpty ? cats.first : null);
+                    },
+                  ),
+                );
+            targetCategoryId = defaultBillCat?.id ?? 1;
+          } else {
+            // Default legacy/null income category:
+            // 1. 'Lương'
+            // 2. 'Thưởng'
+            final defaultIncomeCat = cats.cast<Category?>().firstWhere(
+                  (c) => c!.name == 'Lương',
+                  orElse: () => cats.cast<Category?>().firstWhere(
+                        (c) => c!.name == 'Thưởng',
+                        orElse: () => cats.isNotEmpty ? cats.first : null,
+                      ),
+                );
+            targetCategoryId = defaultIncomeCat?.id ?? 1;
+          }
+        }
+
+        if (item.kind == 'BILL') {
+          alertCategoryId = targetCategoryId;
         }
 
         final nowMs = DateTime.now().millisecondsSinceEpoch;
+        final payKey = 'scheduled_pay_${item.id}';
         int createdTxId;
 
         if (item.kind == 'PLANNED_INCOME') {
@@ -355,6 +757,7 @@ class PlansController extends AsyncNotifier<void> {
               amountVnd: item.amountVnd,
               occurredAt: nowMs,
               description: item.title,
+              idempotencyKey: payKey,
             ),
           );
         } else {
@@ -393,6 +796,7 @@ class PlansController extends AsyncNotifier<void> {
               amountVnd: item.amountVnd,
               envelopeId: envelopeToLink ?? item.linkedEnvelopeId,
             ),
+            idempotencyKey: payKey,
             linkedEnvelopeId: envelopeToLink,
             envelopeMovementType: envelopeToLink != null ? 'SPEND' : null,
           );
@@ -428,34 +832,17 @@ class PlansController extends AsyncNotifier<void> {
           ),
         );
 
-        // If recurring, insert next occurrence preserving anchorDayOfMonth
-        if (item.recurrence != 'NONE') {
-          final currentDue =
-              DateTime.fromMillisecondsSinceEpoch(item.dueDateMs);
-          final nextDue = RecurrenceCalculator.computeNextDueDate(
-            currentDueDate: currentDue,
-            recurrence: item.recurrence,
-            anchorDayOfMonth: item.anchorDayOfMonth,
-          );
-          await db.into(db.scheduledItems).insert(
-                ScheduledItemsCompanion.insert(
-                  kind: item.kind,
-                  title: item.title,
-                  amountVnd: item.amountVnd,
-                  dueDateMs: nextDue.millisecondsSinceEpoch,
-                  recurrence: Value(item.recurrence),
-                  anchorDayOfMonth:
-                      Value(item.anchorDayOfMonth ?? currentDue.day),
-                  categoryId: Value(item.categoryId),
-                  linkedEnvelopeId: Value(item.linkedEnvelopeId),
-                  status: const Value('PENDING'),
-                  reminderDaysBefore: Value(item.reminderDaysBefore),
-                ),
-              );
-        }
-
         return createdTxId;
       });
+
+      final scheduler = ref.read(notificationSchedulerProvider);
+      await scheduler.reconcileFromDatabase(db);
+      if (alertCategoryId != null) {
+        await scheduler.checkCategoryBudgetAlert(
+          db: db,
+          categoryId: alertCategoryId!,
+        );
+      }
 
       state = const AsyncValue.data(null);
       return txId;

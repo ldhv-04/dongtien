@@ -145,6 +145,12 @@ class _TransferModalState extends ConsumerState<TransferModal> {
                 onDigitPressed: _onDigit,
                 onBackspacePressed: _onBackspace,
                 onDonePressed: _submit,
+                isSubmitting: _isSubmitting,
+                isDoneEnabled: !isBlocked &&
+                    _sourceId != null &&
+                    _destId != null &&
+                    _sourceId != _destId &&
+                    _amountVnd > 0,
               ),
               AppSpacing.gapH8,
               Semantics(
@@ -174,16 +180,40 @@ class _TransferModalState extends ConsumerState<TransferModal> {
   }
 
   Future<void> _submit() async {
-    if (_sourceId == null || _destId == null || _sourceId == _destId) return;
+    if (_isSubmitting ||
+        _sourceId == null ||
+        _destId == null ||
+        _sourceId == _destId ||
+        _amountVnd <= 0) {
+      return;
+    }
+    Envelope? source;
+    for (final e in widget.envelopes) {
+      if (e.id == _sourceId) {
+        source = e;
+        break;
+      }
+    }
+    if (source != null &&
+        _amountVnd > source.reservedBalanceVnd &&
+        !source.allowNegativeException) {
+      return;
+    }
+
     setState(() => _isSubmitting = true);
-    final ok = await ref.read(envelopeControllerProvider.notifier).transfer(
-          fromEnvelopeId: _sourceId!,
-          toEnvelopeId: _destId!,
-          amountVnd: _amountVnd,
-        );
-    if (mounted) {
-      setState(() => _isSubmitting = false);
-      if (ok) Navigator.of(context).pop();
+    try {
+      final ok = await ref.read(envelopeControllerProvider.notifier).transfer(
+            fromEnvelopeId: _sourceId!,
+            toEnvelopeId: _destId!,
+            amountVnd: _amountVnd,
+          );
+      if (mounted && ok) {
+        Navigator.of(context).pop();
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
     }
   }
 }

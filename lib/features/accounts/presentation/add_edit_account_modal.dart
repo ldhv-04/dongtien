@@ -182,6 +182,8 @@ class _AddEditAccountModalState extends ConsumerState<AddEditAccountModal> {
                   onDigitPressed: _onDigitPressed,
                   onBackspacePressed: _onBackspacePressed,
                   onDonePressed: _submit,
+                  isSubmitting: _isSubmitting,
+                  isDoneEnabled: _nameController.text.trim().isNotEmpty,
                 ),
               ],
               AppSpacing.gapH12,
@@ -205,6 +207,7 @@ class _AddEditAccountModalState extends ConsumerState<AddEditAccountModal> {
   }
 
   Future<void> _submit() async {
+    if (_isSubmitting) return;
     final name = _nameController.text.trim();
     if (name.isEmpty) return;
 

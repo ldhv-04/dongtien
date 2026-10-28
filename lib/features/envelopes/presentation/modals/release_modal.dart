@@ -126,6 +126,9 @@ class _ReleaseModalState extends ConsumerState<ReleaseModal> {
                 onDigitPressed: _onDigit,
                 onBackspacePressed: _onBackspace,
                 onDonePressed: _submit,
+                isSubmitting: _isSubmitting,
+                isDoneEnabled:
+                    !isBlocked && _selectedEnvelopeId != null && _amountVnd > 0,
               ),
               AppSpacing.gapH8,
               Semantics(
@@ -153,15 +156,28 @@ class _ReleaseModalState extends ConsumerState<ReleaseModal> {
   }
 
   Future<void> _submit() async {
-    if (_selectedEnvelopeId == null || _amountVnd <= 0) return;
+    if (_isSubmitting || _selectedEnvelopeId == null || _amountVnd <= 0) return;
+    final selected =
+        widget.envelopes.where((e) => e.id == _selectedEnvelopeId).firstOrNull;
+    if (selected != null &&
+        _amountVnd > selected.reservedBalanceVnd &&
+        !selected.allowNegativeException) {
+      return;
+    }
+
     setState(() => _isSubmitting = true);
-    final ok = await ref.read(envelopeControllerProvider.notifier).release(
-          envelopeId: _selectedEnvelopeId!,
-          amountVnd: _amountVnd,
-        );
-    if (mounted) {
-      setState(() => _isSubmitting = false);
-      if (ok) Navigator.of(context).pop();
+    try {
+      final ok = await ref.read(envelopeControllerProvider.notifier).release(
+            envelopeId: _selectedEnvelopeId!,
+            amountVnd: _amountVnd,
+          );
+      if (mounted && ok) {
+        Navigator.of(context).pop();
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
     }
   }
 }

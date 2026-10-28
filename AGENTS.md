@@ -265,3 +265,13 @@ Before any phase or subagent handoff is declared complete, all code must pass th
   - Do NOT hardcode test results or expected strings in source code.
   - Do NOT create dummy/facade implementations that fake business logic.
   - Every calculation must be live and derive from actual state.
+- **Explicit Category Selection & No Silent Category Fallback (`cats.first`)**:
+  - NEVER fall back to an arbitrary category such as `categories.first` (which defaults to `Ăn uống` / Food) when creating or paying a scheduled obligation (`BILL` / `PLANNED_INCOME`) or posting any transaction.
+  - Creating or editing a scheduled obligation (`BILL` / `PLANNED_INCOME`) MUST allow the user to explicitly select its category (defaulting to `Hoá đơn & Tiện ích` for `BILL` and `Lương` for `PLANNED_INCOME`), and paying a scheduled bill MUST only affect the budget of its explicitly assigned category (and NEVER deduct from unrelated category budgets or virtual fund envelopes like `Ăn uống`).
+- **Single Source of Truth for Billing Cycle Window (`periodStartDay`)**:
+  - NEVER hardcode `DateTime(now.year, now.month, 1)` for monthly budgets, Safe-to-Spend horizons, or financial reports.
+  - Every period-bound query and provider (`currentMonthlyBudgetSummaryProvider`, `safeToSpendProvider`, `reportsSummaryProvider`, `checkCategoryBudgetAlert`, `upsertCategoryBudget`) MUST reactively watch `settingsStreamProvider` and compute the active billing cycle window `[cycleStart, cycleEnd)` and cycle `yearMonth` identifier using `setting.periodStartDay` (1–28).
+- **Full CRUD Symmetry & Atomic Ledger Reversal on Financial Plan Widgets**:
+  - Every user-created entity widget on Financial Plans (`CategoryBudgets`, `SavingsGoals`, `ScheduledItems`) MUST provide both Edit (`Sửa`) and Delete (`Xóa`) actions with confirmation dialogs and `_isSubmitting` double-tap guards.
+  - Deleting or editing a `PAID_OR_RECEIVED` scheduled obligation MUST atomically reverse (`voidTransaction`) or supersede its linked `paidTransactionId` in `journal_transactions` and restore any linked virtual envelope balance.
+

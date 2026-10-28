@@ -1,6 +1,7 @@
 import 'package:dongtien/app/app.dart';
 import 'package:dongtien/core/database/app_database.dart';
 import 'package:dongtien/core/money/vnd_money.dart';
+import 'package:dongtien/core/notifications/notification_scheduler.dart';
 import 'package:dongtien/domain/budgeting/category_budget_progress.dart';
 import 'package:dongtien/domain/budgeting/category_spending_calculator.dart';
 import 'package:dongtien/domain/forecasting/safe_to_spend_calculator.dart';
@@ -12,10 +13,37 @@ import 'package:dongtien/features/reports_settings/presentation/reports_screen.d
 import 'package:dongtien/features/reports_settings/presentation/settings_screen.dart';
 import 'package:dongtien/features/transactions/presentation/controllers/transaction_providers.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUpAll(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(const MethodChannel('flutter_timezone'),
+            (call) async {
+      if (call.method == 'getLocalTimezone') {
+        return 'Asia/Ho_Chi_Minh';
+      }
+      return null;
+    });
+
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+            const MethodChannel('dexterous.com/flutter/local_notifications'),
+            (call) async {
+      if (call.method == 'initialize') {
+        return true;
+      }
+      if (call.method == 'requestNotificationsPermission') {
+        return null;
+      }
+      return null;
+    });
+  });
+
   group('Full App Navigation & Feature Screens Widget Tests', () {
     testWidgets(
         'MainNavigationShell switches across all 4 tabs and renders screens',
@@ -178,6 +206,97 @@ void main() {
       expect(find.text('500.000 ₫'), findsOneWidget);
       expect(find.text('Tạo bản sao lưu mã hóa (.json)'), findsOneWidget);
       expect(find.text('Tạo dữ liệu mẫu'), findsOneWidget);
+      expect(find.text('Gửi thông báo kiểm tra ngay'), findsOneWidget);
+    });
+
+    testWidgets(
+        'SettingsScreen btn_test_notification triggers test notification and shows snackbar',
+        (tester) async {
+      final scheduler = NotificationScheduler(initialPermissionGranted: true);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            notificationSchedulerProvider.overrideWithValue(scheduler),
+            settingsStreamProvider.overrideWith(
+              (ref) => Stream.value(
+                const Setting(
+                  id: 1,
+                  minimumCashBufferVnd: 500000,
+                  periodStartDay: 1,
+                  dailyReminderHour: 20,
+                  dailyReminderMinute: 0,
+                  notificationsEnabled: true,
+                  schemaVersion: 1,
+                ),
+              ),
+            ),
+          ],
+          child: const MaterialApp(
+            home: SettingsScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Gửi thông báo kiểm tra ngay'), findsOneWidget);
+      await tester.ensureVisible(find.text('Gửi thông báo kiểm tra ngay'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Gửi thông báo kiểm tra ngay'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(
+          find.text('Đã gửi thông báo kiểm tra thành công!'), findsOneWidget);
+    });
+
+    testWidgets(
+        'SettingsScreen displays permission banner when notification permission is denied',
+        (tester) async {
+      final scheduler = NotificationScheduler(initialPermissionGranted: false);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            notificationSchedulerProvider.overrideWithValue(scheduler),
+            settingsStreamProvider.overrideWith(
+              (ref) => Stream.value(
+                const Setting(
+                  id: 1,
+                  minimumCashBufferVnd: 500000,
+                  periodStartDay: 1,
+                  dailyReminderHour: 20,
+                  dailyReminderMinute: 0,
+                  notificationsEnabled: true,
+                  schemaVersion: 1,
+                ),
+              ),
+            ),
+          ],
+          child: const MaterialApp(
+            home: SettingsScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Banner should be displayed
+      expect(
+        find.textContaining('Quyền thông báo đang tắt trên thiết bị'),
+        findsOneWidget,
+      );
+
+      // Tapping test button when denied shows ruby warning snackbar
+      await tester.ensureVisible(find.text('Gửi thông báo kiểm tra ngay'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Gửi thông báo kiểm tra ngay'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(
+        find.textContaining('Quyền thông báo bị từ chối trên thiết bị'),
+        findsOneWidget,
+      );
     });
   });
 }

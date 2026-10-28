@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_spacing.dart';
 import '../../../../app/theme/app_typography.dart';
+import '../../../../core/money/vnd_formatter.dart';
 import '../../../../core/widgets/progress_bar.dart';
 import '../../../../domain/budgeting/category_budget_progress.dart';
 
@@ -47,6 +48,7 @@ class SpendingVsBudgetCard extends StatelessWidget {
                       '$pct%',
                       style: AppTypography.bodyMedium.copyWith(
                         fontWeight: FontWeight.w700,
+                        fontFeatures: const [FontFeature.tabularFigures()],
                         color: summary.exceededCount > 0
                             ? AppColors.textAccentRubyPrimary
                             : (summary.warningCount > 0
@@ -56,6 +58,16 @@ class SpendingVsBudgetCard extends StatelessWidget {
                     ),
                   ],
                 ),
+                if (summary.cycleLabel.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    'Chu kỳ: ${summary.cycleLabel}',
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.textSecondary,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ],
                 AppSpacing.gapH8,
 
                 // Progress Bar
@@ -68,14 +80,18 @@ class SpendingVsBudgetCard extends StatelessWidget {
                   children: [
                     Text(
                       'Đã chi: ${summary.totalSpentVnd.formatVnd()}',
-                      style: AppTypography.caption.copyWith(
-                        color: AppColors.textSecondary,
+                      style: VndFormatter.withTabularFigures(
+                        AppTypography.caption.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ),
                     Text(
                       'Hạn mức: ${summary.totalLimitVnd.formatVnd()}',
-                      style: AppTypography.caption.copyWith(
-                        color: AppColors.textSecondary,
+                      style: VndFormatter.withTabularFigures(
+                        AppTypography.caption.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ),
                   ],

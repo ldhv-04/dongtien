@@ -1,16 +1,18 @@
 # Progress — challenger_m1_1
 
-Last visited: 2026-10-27T18:17:00Z
+Last visited: 2026-10-28T01:12:00Z
 
 ## Current Status
-- [x] Initialized DISPATCH.md and BRIEFING.md
-- [x] Inspected source files: `lib/core/money/vnd_money.dart`, `lib/core/money/vnd_formatter.dart`, and `test/unit/vnd_money_test.dart`
-- [x] Inspected requirements in `AGENTS.md`, `ORIGINAL_REQUEST.md`, and `build_spec/dongtien_build_spec.md`
-- [x] Run baseline test: `flutter test test/unit/vnd_money_test.dart` (30/30 tests PASSED)
-- [x] Design and implement adversarial test suite `test/unit/vnd_money_adversarial_test.dart`
-- [x] Executed adversarial test suite: 26 passed, 2 reproduced bugs identified:
-  - BUG 1 (Medium Severity): `VndFormatter.tryParse` accepts multiple signs (`--1000`, `++1000`, `+-1000`, `- - 1000`) and evaluates `--1000` as positive `1000`.
-  - BUG 2 (Low Severity): `VndFormatter.parse` docstring specifies `VndOverflowException` on overflow, but `FormatException` is thrown.
-- [ ] Produce handoff report (`handoff.md`) with verdict `REQUEST_CHANGES`
-- [ ] Update BRIEFING.md
-- [ ] Send completion message to parent agent
+- [x] Received dispatch for Milestone M1 SQL logic stress testing.
+- [x] Initialized DISPATCH.md and BRIEFING.md.
+- [x] Audited changes made by worker_m1 in `dashboard_providers.dart` and `reports_settings_providers.dart`.
+- [x] Formulated test matrix for all 5 edge case categories:
+  1. Zero budgets configured for current month.
+  2. Categories with zero spending in period.
+  3. Multiple refunds exceeding gross expense (net expense < 0).
+  4. Voided and superseded transactions + audit reversal exclusion.
+  5. Exact millisecond month boundary timestamps (start - 1, start, end, end + 1).
+  6. Reactive observation over stream.
+- [ ] Create and execute `test/database/m1_sql_edge_conditions_challenge_test.dart`.
+- [ ] Run full test suite.
+- [ ] Deliver verdict (APPROVE or REQUEST_CHANGES) in handoff.md and send message back to orchestrator_2.

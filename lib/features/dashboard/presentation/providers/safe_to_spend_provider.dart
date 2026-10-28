@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/money/vnd_money.dart';
+import '../../../../domain/budgeting/billing_cycle_calculator.dart';
 import '../../../../domain/forecasting/safe_to_spend_calculator.dart';
 import 'dashboard_providers.dart';
 
@@ -66,9 +67,9 @@ final safeToSpendProvider = Provider<AsyncValue<SafeToSpendResult>>((ref) {
   if (nextIncome != null) {
     horizonDate = DateTime.fromMillisecondsSinceEpoch(nextIncome.dueDateMs);
   } else {
-    // End of current month
-    final lastDay = DateTime(now.year, now.month + 1, 0).day;
-    horizonDate = DateTime(now.year, now.month, lastDay, 23, 59, 59);
+    final periodStartDay = (settings?.periodStartDay ?? 1).clamp(1, 28);
+    final cycle = BillingCycleCalculator.calculate(now, periodStartDay);
+    horizonDate = cycle.cycleEndInclusive;
   }
 
   final result = SafeToSpendCalculator.calculate(

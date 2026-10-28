@@ -3,15 +3,60 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_spacing.dart';
 import '../../../../app/theme/app_typography.dart';
+import '../../../../core/database/app_database.dart';
 import '../../../../core/money/vnd_formatter.dart';
 import '../../../../core/widgets/progress_bar.dart';
+import '../../../../domain/budgeting/feasibility_advisor.dart';
 import '../../../../domain/budgeting/goal_calculator.dart';
+import '../../../dashboard/presentation/providers/dashboard_providers.dart';
 import '../../../envelopes/presentation/modals/envelope_form_modal.dart';
 import '../providers/plans_providers.dart';
 
 /// Sub-view (b) of Plans tab: Savings Goals & Feasibility Advisor with 3 one-tap calculators.
 class SavingsGoalsView extends ConsumerWidget {
   const SavingsGoalsView({super.key});
+
+  Future<void> _confirmAndDeleteGoal(
+    BuildContext context,
+    WidgetRef ref,
+    ActiveGoalItem goal,
+  ) async {
+    final hasReserve = goal.currentReserved.amount > 0;
+    final message = hasReserve
+        ? 'Mục tiêu "${goal.name}" đang có ${VndFormatter.formatMoney(goal.currentReserved)} tiền bảo lưu. Khi xóa, toàn bộ số tiền này sẽ được giải phóng về tiền khả dụng (Available to Allocate). Bạn có chắc chắn muốn xóa không?'
+        : 'Bạn có chắc chắn muốn xóa mục tiêu "${goal.name}" không?';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Xác nhận xóa mục tiêu'),
+        content: Text(
+          message,
+          style: VndFormatter.withTabularFigures(AppTypography.bodyMedium),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.fillAccentRubyPrimary,
+              foregroundColor: AppColors.textInverse,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Xóa'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      await ref
+          .read(plansControllerProvider.notifier)
+          .deleteSavingsGoal(goal.id);
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -213,6 +258,57 @@ class SavingsGoalsView extends ConsumerWidget {
                             style: VndFormatter.withTabularFigures(
                               AppTypography.caption,
                             ),
+                          ),
+                          AppSpacing.gapH8,
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Semantics(
+                                identifier: 'btn_edit_goal_${goal.id}',
+                                button: true,
+                                child: TextButton.icon(
+                                  icon:
+                                      const Icon(Icons.edit_outlined, size: 16),
+                                  label: const Text('Sửa'),
+                                  onPressed: () async {
+                                    final envelopes = ref
+                                            .read(envelopesStreamProvider)
+                                            .value ??
+                                        [];
+                                    final env =
+                                        envelopes.cast<Envelope?>().firstWhere(
+                                              (e) => e!.id == goal.id,
+                                              orElse: () => null,
+                                            );
+                                    if (env != null && context.mounted) {
+                                      await showModalBottomSheet<void>(
+                                        context: context,
+                                        isScrollControlled: true,
+                                        backgroundColor: Colors.transparent,
+                                        builder: (_) => EnvelopeFormModal(
+                                            editingEnvelope: env),
+                                      );
+                                    }
+                                  },
+                                ),
+                              ),
+                              AppSpacing.gapW8,
+                              Semantics(
+                                identifier: 'btn_delete_goal_${goal.id}',
+                                button: true,
+                                child: TextButton.icon(
+                                  icon: const Icon(Icons.delete_outline,
+                                      size: 16,
+                                      color: AppColors.textAccentRubyPrimary),
+                                  label: const Text('Xóa',
+                                      style: TextStyle(
+                                          color:
+                                              AppColors.textAccentRubyPrimary)),
+                                  onPressed: () =>
+                                      _confirmAndDeleteGoal(context, ref, goal),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),

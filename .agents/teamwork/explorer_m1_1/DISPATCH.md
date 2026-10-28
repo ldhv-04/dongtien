@@ -1,24 +1,29 @@
-## 2026-10-27T17:39:33Z
-You are explorer_m1_1, working as Scaffolding & Core Architecture Explorer for Milestone M1.
-Your working directory is: c:\Users\coihu12\Documents\App\.agents\teamwork\explorer_m1_1
+## 2026-10-28T18:40:10Z
+From: b3a0cd18-f6b1-42d4-9173-c648bf560f2f (Parent)
+Content:
+You are Explorer 1 on Project Đồng Tiền.
+Your working directory is: `c:\Users\coihu12\Documents\App\.agents\teamwork\explorer_m1_1`
+All your intermediate progress and final report must be written inside your working directory (`progress.md`, `handoff.md`).
 
-Read the authoritative user request at: c:\Users\coihu12\Documents\App\.agents\teamwork\ORIGINAL_REQUEST.md
-Read the build specification at: c:\Users\coihu12\Documents\App\build_spec\dongtien_build_spec.md
-Read the project scope at: c:\Users\coihu12\Documents\App\.agents\teamwork\orchestrator_1\PROJECT.md
-Read the approved architectural documents:
-- c:\Users\coihu12\Documents\App\AGENTS.md
-- c:\Users\coihu12\Documents\App\docs\ARCHITECTURE_AND_RULES.md
-- c:\Users\coihu12\Documents\App\docs\DESIGN_AND_TEST_PLAN.md
+MANDATORY READING:
+1. `c:\Users\coihu12\Documents\App\.agents\teamwork\ORIGINAL_REQUEST.md` (Specifically read section `## 2026-10-28T18:36:33Z` and Requirement R1).
+2. `c:\Users\coihu12\Documents\App\AGENTS.md` (Architectural invariants, integer VND, clean architecture rules).
+3. `c:\Users\coihu12\Documents\App\.agents\teamwork\orchestrator_3\SCOPE.md`
 
-Your Milestone: M1 (Scaffold & Drift Database Schema).
-Your investigation scope:
-1. Flutter project scaffolding without clobbering existing `build_spec/`, `docs/`, or `.agents/`.
-2. Exact structure and content for `pubspec.yaml` (locked dependencies: flutter_riverpod, drift, drift_flutter, sqlite3_flutter_libs, path_provider, path, flutter_local_notifications, timezone, flutter_timezone, intl, share_plus, file_picker, cryptography; dev: flutter_test, integration_test, drift_dev, build_runner, flutter_lints).
-3. Exact structure and content for `analysis_options.yaml` (clean lints, tabular numerals rule).
-4. Concrete design and implementation plan for `lib/core/money/vnd_money.dart` (64-bit integer, zero decimals, overflow guard max_Safe_VND = 9 quadrillion VND, operators +, -, *, ~/) and `lib/core/money/vnd_formatter.dart` (vi_VN dot separator, tabular figures).
-5. Unit test design for VndMoney in `test/unit/vnd_money_test.dart`.
+YOUR INVESTIGATION OBJECTIVE: R1 (Scheduled Obligations Category Selection & Isolation — Option B)
+1. Inspect `lib/features/plans/presentation/widgets/obligations_forecast_view.dart`:
+   - How `_AddScheduledItemModal` is constructed, how `categoryId` is currently handled (or missing), how to present a clean Category selector filtered by kind (`EXPENSE` when `_kind == 'BILL'`, `INCOME` when `_kind == 'PLANNED_INCOME'`).
+   - How the category should default (`Hoá đơn & Tiện ích` for `BILL`, `Lương` for `PLANNED_INCOME`).
+   - How scheduled item cards in `ObligationsForecastView` and `UpcomingObligationsCard` display the category name.
+2. Inspect `lib/features/plans/presentation/providers/plans_providers.dart`:
+   - Inspect `PlansController.markScheduledItemPaid`. Find the `cats.first.id` fallback and explain exactly how it causes bills like rent (3.500.000 ₫) to corrupt the `Ăn uống` category budget.
+   - Design the exact logic to eliminate `cats.first` fallback, defaulting legacy null category bills to `Hoá đơn & Tiện ích` (never `cats.first`), and verifying that paying a bill only affects its assigned category budget and envelope.
+3. Check existing tests in `test/` for scheduled items and budget impacts.
 
-Maintain `progress.md` in your working directory.
-Deliver your implementation plan and handoff report to:
-c:\Users\coihu12\Documents\App\.agents\teamwork\explorer_m1_1\handoff.md
-Send a completion message back with summary and handoff path.
+Deliverable:
+Write a comprehensive report to `c:\Users\coihu12\Documents\App\.agents\teamwork\explorer_m1_1\handoff.md` detailing:
+- Exact lines and methods to modify
+- UI implementation plan for the category picker in `_AddScheduledItemModal`
+- Controller logic changes in `PlansController`
+- Test specifications to verify isolation between bill payment and unrelated category budgets/envelopes.
+Send a message back to the orchestrator when finished.

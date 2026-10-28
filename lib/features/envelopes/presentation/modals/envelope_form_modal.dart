@@ -166,6 +166,8 @@ class _EnvelopeFormModalState extends ConsumerState<EnvelopeFormModal> {
                 onDigitPressed: _onDigit,
                 onBackspacePressed: _onBackspace,
                 onDonePressed: _submit,
+                isSubmitting: _isSubmitting,
+                isDoneEnabled: _nameController.text.trim().isNotEmpty,
               ),
               AppSpacing.gapH8,
               ElevatedButton(
@@ -184,38 +186,44 @@ class _EnvelopeFormModalState extends ConsumerState<EnvelopeFormModal> {
   }
 
   Future<void> _submit() async {
+    if (_isSubmitting) return;
     final name = _nameController.text.trim();
     if (name.isEmpty) return;
 
     setState(() => _isSubmitting = true);
-    final controller = ref.read(envelopeControllerProvider.notifier);
-    final targetVal = _targetAmountVnd > 0 ? _targetAmountVnd : null;
+    try {
+      final controller = ref.read(envelopeControllerProvider.notifier);
+      final targetVal = _targetAmountVnd > 0 ? _targetAmountVnd : null;
 
-    bool ok;
-    if (widget.editingEnvelope != null) {
-      ok = await controller.updateEnvelope(
-        id: widget.editingEnvelope!.id,
-        name: name,
-        policy: _policy,
-        targetAmountVnd: targetVal,
-        targetDate: _targetDate,
-        allowNegativeException: _allowNegativeException,
-        priority: _priority,
-      );
-    } else {
-      ok = await controller.createEnvelope(
-        name: name,
-        policy: _policy,
-        targetAmountVnd: targetVal,
-        targetDate: _targetDate,
-        allowNegativeException: _allowNegativeException,
-        priority: _priority,
-      );
-    }
+      bool ok;
+      if (widget.editingEnvelope != null) {
+        ok = await controller.updateEnvelope(
+          id: widget.editingEnvelope!.id,
+          name: name,
+          policy: _policy,
+          targetAmountVnd: targetVal,
+          targetDate: _targetDate,
+          allowNegativeException: _allowNegativeException,
+          priority: _priority,
+        );
+      } else {
+        ok = await controller.createEnvelope(
+          name: name,
+          policy: _policy,
+          targetAmountVnd: targetVal,
+          targetDate: _targetDate,
+          allowNegativeException: _allowNegativeException,
+          priority: _priority,
+        );
+      }
 
-    if (mounted) {
-      setState(() => _isSubmitting = false);
-      if (ok) Navigator.of(context).pop();
+      if (mounted && ok) {
+        Navigator.of(context).pop();
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
     }
   }
 }

@@ -1,17 +1,18 @@
 # Progress Tracker — auditor_m1_1
 
-Last visited: 2026-10-28T01:12:10Z
+Last visited: 2026-10-28T01:15:30Z
 Status: In Progress
 
 ## Tasks
 - [x] Record dispatch and initialize BRIEFING.md
-- [x] Read ORIGINAL_REQUEST.md and verify integrity mode
-- [x] Inspect pubspec.yaml and pubspec.lock for forbidden packages (zero forbidden packages confirmed)
-- [x] Inspect lib/core/money/vnd_money.dart and vnd_formatter.dart for facade/hardcoding (genuine implementations confirmed)
-- [x] Inspect lib/core/database/app_database.dart and 9 tables definition (all 9 tables, constraints, indexes, FKs verified)
-- [x] Inspect seeding logic (categories and accounts seeded, 0 fake txs, 0 balances confirmed)
-- [x] Run dart format check (passed, 0 changed)
-- [/] Run flutter analyze (running in background)
-- [ ] Verify app_database.g.dart authenticity and build_runner generation
-- [ ] Run flutter test --coverage
-- [ ] Produce adversarial review and integrity report in handoff.md
+- [x] Read ORIGINAL_REQUEST.md and verify integrity mode (development)
+- [x] Read worker_m1 handoff report
+- [ ] Inspect git status and git diff for target files
+- [ ] Source analysis: detect hardcoded values or facades in target files
+- [ ] Inspect SQL query correctness in dashboard_providers.dart and reports_settings_providers.dart
+- [ ] Dependency audit: verify no forbidden packages in pubspec.yaml/pubspec.lock
+- [ ] Run formatting check: dart format
+- [ ] Run static analysis: flutter analyze
+- [ ] Run test suite: flutter test
+- [ ] Adversarial review & stress-test analysis
+- [ ] Compile handoff.md and report to orchestrator

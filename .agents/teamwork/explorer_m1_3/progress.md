@@ -1,28 +1,19 @@
-# Progress — explorer_m1_3 (Database Seeding & In-Memory Test Explorer)
+# Progress Log — Explorer 3 (R3: Synchronize periodStartDay)
 
-Last visited: 2026-10-27T17:48:00Z
+- **Status**: Investigation complete, handoff report generated
+- **Last visited**: 2026-10-28T18:48:00Z
 
-## Status: COMPLETE
-- [x] Initialized DISPATCH.md, BRIEFING.md, and progress.md
-- [x] Read authoritative documentation:
-  - ORIGINAL_REQUEST.md
-  - dongtien_build_spec.md
-  - orchestrator_1/PROJECT.md
-  - AGENTS.md
-  - ARCHITECTURE_AND_RULES.md
-  - DESIGN_AND_TEST_PLAN.md
-- [x] Check existing repository files in `lib/core/database/` and `test/`
-- [x] Explore peer findings from explorer_m1_1 and spec_miner_m1_2
-- [x] Analyze Drift `MigrationStrategy.onCreate` seeding design:
-  - 3 System accounts (`EQUITY_OPENING`, default Income, default Expense)
-  - 8 Vietnamese categories with icon codes and colors
-  - 0 ₫ initial balances invariant (zero fake transactions)
-- [x] Execute and verify SQLite in-memory test simulation (`test_sqlite_simulation.py`)
-- [x] Design in-memory database test suite (`test/database/app_database_test.dart`):
-  - Drift `NativeDatabase.memory()` lifecycle and SQLite connection setup
-  - Foreign key enforcement assertion (`PRAGMA foreign_keys = ON;`)
-  - Seeding verification tests
-  - Balanced transaction and journal posting constraint tests
-  - Unique index and integrity tests
-- [x] Synthesize findings into structured 5-component `handoff.md`
-- [x] Send completion message to parent orchestrator
+## Planned Steps
+1. [x] Read mandatory reference docs (`ORIGINAL_REQUEST.md`, `AGENTS.md`, `orchestrator_3/SCOPE.md`).
+2. [x] Run baseline `flutter test` (All 308 tests passed).
+3. [x] Inspect `Settings` table schema in `lib/core/database/` and settings provider in `lib/features/reports_settings/`.
+4. [x] Deep dive into `BillingCycleCalculator` pure domain class algorithm, edge cases, properties, formatting methods.
+5. [x] Inspect `currentMonthlyBudgetSummaryProvider` in `lib/features/dashboard/presentation/providers/dashboard_providers.dart`.
+6. [x] Inspect `safeToSpendProvider` in `lib/features/dashboard/presentation/providers/safe_to_spend_provider.dart`.
+7. [x] Inspect `PlansController.upsertCategoryBudget` & `deleteCategoryBudget` in `lib/features/plans/presentation/providers/plans_providers.dart`.
+8. [x] Inspect `NotificationScheduler.checkCategoryBudgetAlert` in `lib/core/notifications/notification_scheduler.dart`.
+9. [x] Inspect `reportsSummaryProvider` in `lib/features/reports_settings/presentation/providers/reports_settings_providers.dart`.
+10. [x] Inspect UI widgets: `SpendingVsBudgetCard` and `CategoryBudgetsView` for active cycle date range display with tabular figures.
+11. [x] Synthesize findings and write comprehensive `handoff.md`.
+12. [x] Update `BRIEFING.md`.
+13. [x] Send notification to orchestrator.

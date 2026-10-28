@@ -435,6 +435,8 @@ class _QuickAddModalState extends ConsumerState<QuickAddModal> {
                 onDigitPressed: _onDigitPressed,
                 onBackspacePressed: _onBackspacePressed,
                 onDonePressed: () => _handleSubmit(allAccounts),
+                isSubmitting: _isSubmitting,
+                isDoneEnabled: !isBlockedByDeficit && _amountVnd > 0,
               ),
               AppSpacing.gapH8,
               Semantics(
@@ -540,6 +542,17 @@ class _QuickAddModalState extends ConsumerState<QuickAddModal> {
 
   Future<void> _handleSubmit(List<AccountWithBalance> allAccounts) async {
     if (_isSubmitting || _amountVnd <= 0) return;
+    if (_selectedType == TransactionType.expense &&
+        _selectedEnvelopeId != null) {
+      final allEnvelopes = ref.read(envelopesStreamProvider).value ?? [];
+      final env =
+          allEnvelopes.where((e) => e.id == _selectedEnvelopeId).firstOrNull;
+      if (env != null &&
+          _amountVnd > env.reservedBalanceVnd &&
+          !env.allowNegativeException) {
+        return;
+      }
+    }
 
     setState(() {
       _isSubmitting = true;

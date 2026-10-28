@@ -10,12 +10,18 @@ class UpcomingObligationsCard extends StatelessWidget {
   final List<ScheduledItem> pendingBills;
   final ScheduledItem? nextIncome;
   final ValueChanged<int> onPayObligation;
+  final ValueChanged<ScheduledItem>? onEditObligation;
+  final ValueChanged<ScheduledItem>? onDeleteObligation;
+  final Map<int, String>? categoryNames;
 
   const UpcomingObligationsCard({
     super.key,
     required this.pendingBills,
     this.nextIncome,
     required this.onPayObligation,
+    this.onEditObligation,
+    this.onDeleteObligation,
+    this.categoryNames,
   });
 
   @override
@@ -59,10 +65,53 @@ class UpcomingObligationsCard extends StatelessWidget {
                       Expanded(
                         child: Text(
                           'Thu nhập tiếp theo: ${nextIncome!.title} (${VndFormatter.format(nextIncome!.amountVnd)})',
-                          style: AppTypography.caption.copyWith(
-                            color: AppColors.jade14,
-                            fontWeight: FontWeight.w600,
+                          style: VndFormatter.withTabularFigures(
+                            AppTypography.caption.copyWith(
+                              color: AppColors.jade14,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
+                        ),
+                      ),
+                      if (onEditObligation != null)
+                        Semantics(
+                          identifier: 'btn_edit_obligation_${nextIncome!.id}',
+                          button: true,
+                          child: IconButton(
+                            icon: const Icon(Icons.edit_outlined, size: 18),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            tooltip: 'Sửa',
+                            onPressed: () => onEditObligation!(nextIncome!),
+                          ),
+                        ),
+                      if (onDeleteObligation != null) ...[
+                        AppSpacing.gapW4,
+                        Semantics(
+                          identifier: 'btn_delete_obligation_${nextIncome!.id}',
+                          button: true,
+                          child: IconButton(
+                            icon: const Icon(Icons.delete_outline,
+                                size: 18,
+                                color: AppColors.textAccentRubyPrimary),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            tooltip: 'Xóa',
+                            onPressed: () => onDeleteObligation!(nextIncome!),
+                          ),
+                        ),
+                      ],
+                      AppSpacing.gapW8,
+                      Semantics(
+                        identifier: 'btn_pay_obligation_${nextIncome!.id}',
+                        button: true,
+                        child: OutlinedButton(
+                          onPressed: () => onPayObligation(nextIncome!.id),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            minimumSize: const Size(64, 32),
+                          ),
+                          child: const Text('Đã nhận'),
                         ),
                       ),
                     ],
@@ -71,6 +120,11 @@ class UpcomingObligationsCard extends StatelessWidget {
                 AppSpacing.gapH8,
               ],
               ...pendingBills.take(3).map((bill) {
+                final catName =
+                    (bill.categoryId != null && categoryNames != null)
+                        ? categoryNames![bill.categoryId!]
+                        : null;
+
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: AppSpacing.sp3),
                   child: Row(
@@ -82,16 +136,56 @@ class UpcomingObligationsCard extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(bill.title, style: AppTypography.bodyMedium),
+                            if (catName != null) ...[
+                              const SizedBox(height: 1),
+                              Text(
+                                catName,
+                                style: AppTypography.caption.copyWith(
+                                  color: AppColors.textTertiary,
+                                ),
+                              ),
+                            ],
                             Text(
                               VndFormatter.format(bill.amountVnd),
-                              style: AppTypography.caption.copyWith(
-                                color: AppColors.textAccentRubySecondary,
-                                fontWeight: FontWeight.w600,
+                              style: VndFormatter.withTabularFigures(
+                                AppTypography.caption.copyWith(
+                                  color: AppColors.textAccentRubySecondary,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                           ],
                         ),
                       ),
+                      if (onEditObligation != null)
+                        Semantics(
+                          identifier: 'btn_edit_obligation_${bill.id}',
+                          button: true,
+                          child: IconButton(
+                            icon: const Icon(Icons.edit_outlined, size: 18),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            tooltip: 'Sửa',
+                            onPressed: () => onEditObligation!(bill),
+                          ),
+                        ),
+                      if (onDeleteObligation != null) ...[
+                        AppSpacing.gapW4,
+                        Semantics(
+                          identifier: 'btn_delete_obligation_${bill.id}',
+                          button: true,
+                          child: IconButton(
+                            icon: const Icon(Icons.delete_outline,
+                                size: 18,
+                                color: AppColors.textAccentRubyPrimary),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            tooltip: 'Xóa',
+                            onPressed: () => onDeleteObligation!(bill),
+                          ),
+                        ),
+                      ],
+                      AppSpacing.gapW8,
                       Semantics(
                         identifier: 'btn_pay_obligation_${bill.id}',
                         button: true,

@@ -4,9 +4,12 @@ import '../../../app/app.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_spacing.dart';
 import '../../../app/theme/app_typography.dart';
+import '../../../core/money/vnd_formatter.dart';
 import '../../plans/presentation/providers/plans_providers.dart';
+import '../../plans/presentation/widgets/obligations_forecast_view.dart';
 import '../../reports_settings/presentation/reports_screen.dart';
 import '../../reports_settings/presentation/settings_screen.dart';
+import '../../transactions/presentation/controllers/transaction_providers.dart';
 import 'providers/dashboard_providers.dart';
 import 'providers/safe_to_spend_provider.dart';
 import 'widgets/fund_progress_card.dart';
@@ -27,6 +30,8 @@ class DashboardScreen extends ConsumerWidget {
     final nextIncomeAsync = ref.watch(nextPlannedIncomeStreamProvider);
     final envelopesAsync = ref.watch(envelopesStreamProvider);
     final recentTxAsync = ref.watch(recentTransactionsStreamProvider);
+    final categories = ref.watch(categoriesStreamProvider).value ?? [];
+    final catMap = {for (final c in categories) c.id: c.name};
 
     return Scaffold(
       appBar: AppBar(
@@ -112,10 +117,93 @@ class DashboardScreen extends ConsumerWidget {
             UpcomingObligationsCard(
               pendingBills: pendingBillsAsync.value ?? [],
               nextIncome: nextIncomeAsync.value,
-              onPayObligation: (billId) {
-                ref
-                    .read(plansControllerProvider.notifier)
-                    .markScheduledItemPaid(scheduledItemId: billId);
+              categoryNames: catMap,
+              onEditObligation: (item) {
+                showScheduledItemModal(context, existingItem: item);
+              },
+              onDeleteObligation: (item) async {
+                final isBill = item.kind == 'BILL';
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: Text(isBill
+                        ? 'Xác nhận xóa hoá đơn'
+                        : 'Xác nhận xóa khoản thu'),
+                    content: Text(
+                      'Bạn có chắc chắn muốn xóa "${item.title}" (${VndFormatter.format(item.amountVnd)}) khỏi danh sách không?',
+                      style: VndFormatter.withTabularFigures(
+                        AppTypography.bodyMedium,
+                      ),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(false),
+                        child: const Text('Hủy'),
+                      ),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.fillAccentRubyPrimary,
+                          foregroundColor: AppColors.textInverse,
+                        ),
+                        onPressed: () => Navigator.of(ctx).pop(true),
+                        child: const Text('Xóa'),
+                      ),
+                    ],
+                  ),
+                );
+
+                if (confirmed == true && context.mounted) {
+                  await ref
+                      .read(plansControllerProvider.notifier)
+                      .deleteScheduledItem(item.id);
+                }
+              },
+              onPayObligation: (itemId) async {
+                final item = (pendingBillsAsync.value ?? [])
+                        .where((b) => b.id == itemId)
+                        .firstOrNull ??
+                    (nextIncomeAsync.value?.id == itemId
+                        ? nextIncomeAsync.value
+                        : null);
+                if (item == null) return;
+
+                final isBill = item.kind == 'BILL';
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: Text(
+                        isBill ? 'Xác nhận thanh toán' : 'Xác nhận đã nhận'),
+                    content: Text(
+                      'Bạn có chắc chắn muốn ghi nhận ${isBill ? 'đã thanh toán hoá đơn' : 'đã nhận khoản thu'} '
+                      '"${item.title}" với số tiền ${VndFormatter.format(item.amountVnd)}?',
+                      style: VndFormatter.withTabularFigures(
+                        AppTypography.bodyMedium,
+                      ),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(false),
+                        child: const Text('Hủy'),
+                      ),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isBill
+                              ? AppColors.fillAccentRubyPrimary
+                              : AppColors.fillAccentVerdantPrimary,
+                          foregroundColor: AppColors.textInverse,
+                        ),
+                        onPressed: () => Navigator.of(ctx).pop(true),
+                        child: Text(isBill ? 'Đã trả' : 'Đã nhận'),
+                      ),
+                    ],
+                  ),
+                );
+
+                if (confirmed == true && context.mounted) {
+                  await ref
+                      .read(plansControllerProvider.notifier)
+                      .markScheduledItemPaid(scheduledItemId: itemId);
+                }
               },
             ),
             AppSpacing.gapH16,

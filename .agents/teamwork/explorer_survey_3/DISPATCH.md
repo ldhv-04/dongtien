@@ -1,34 +1,45 @@
-## 2026-10-27T10:07:13Z
-From: 4b707e3a-5355-44d8-b48d-d32bbd3220b1
-Priority: MESSAGE_PRIORITY_HIGH
+# Dispatch to explorer_survey_3
 
-You are explorer_survey_3, working as Toolchain & Environment Auditor.
-Your working directory is: c:\Users\coihu12\Documents\App\.agents\teamwork\explorer_survey_3
-Read the authoritative user request at: c:\Users\coihu12\Documents\App\.agents\teamwork\ORIGINAL_REQUEST.md
-Read the build specification at: c:\Users\coihu12\Documents\App\build_spec\dongtien_build_spec.md
+## Mission
+Survey codebase for Requirements R3 & R4:
+- R3: Fix SqliteException(1) on category budget creation (`"POSTED"` vs `'POSTED'`), audit all raw SQL queries (`customSelect`, `customUpdate`, `customStatement`).
+- R4: Query optimization (`currentMonthlyBudgetSummaryProvider` single aggregated JOIN GROUP BY, `reportsSummaryProvider` bounded queries). R8 code & resource shrinking in `android/app/build.gradle` and `proguard-rules.pro`. Release split-per-ABI build script and `Launch_DongTien_Emulator.bat`.
 
-Your task is to audit the local development environment, workspace, dependencies, and testing toolchain:
-1. Environment Audit:
-   - Run commands to check versions and status: git --version, flutter --version, dart --version, flutter doctor -v, adb version, adb devices, java -version.
-   - Document toolchain status, available Android SDKs, emulator availability, and Java version.
-2. Workspace & Project Structure Audit:
-   - Inspect existing workspace files and directories in c:\Users\coihu12\Documents\App.
-   - Note what exists (e.g. build_spec, docs/design_refs, .agents) and what needs to be created.
-   - Determine the exact Flutter project scaffolding requirements (project name 'dongtien' or package setup) and how to initialize the Flutter app cleanly in the workspace without overwriting existing build_spec or docs.
-3. Locked Dependency Compatibility Check:
-   - Check compatibility of locked dependencies from Section 3 of build_spec/dongtien_build_spec.md with the active Flutter and Dart SDK.
-   - Ensure strictly forbidden packages (uuid, chart libraries, go_router, freezed, dio/http, firebase_*, flutter_secure_storage, sqlcipher) are avoided.
-   - Check build_runner and drift_dev versions for code generation.
-4. Testing & Verification Infrastructure:
-   - Identify test directory structure: test/unit/, test/database/, test/widget/, integration_test/, maestro/.
-   - Document exact verification commands required by Section 8:
-     * dart format --output=none --set-exit-if-changed .
-     * flutter analyze
-     * flutter test --coverage
-     * flutter build apk --debug
-     * Integration test command (if emulator is active)
+## Inputs
+- Authoritative request: `c:\Users\coihu12\Documents\App\.agents\teamwork\ORIGINAL_REQUEST.md` (specifically ## 2026-10-28T00:39:16Z § R3 and § R4)
+- Project rules: `c:\Users\coihu12\Documents\App\AGENTS.md`
+- Target code areas:
+  - `lib/features/dashboard/presentation/providers/dashboard_providers.dart`
+  - `lib/features/reports_settings/presentation/providers/reports_providers.dart`
+  - All occurrences of `customSelect`, `customUpdate`, `customStatement` in `lib/core/database/` and elsewhere
+  - `android/app/build.gradle`, `android/app/proguard-rules.pro`
+  - `Launch_DongTien_Emulator.bat`
 
-Maintain progress.md in your working directory with timestamps.
-When complete, write your comprehensive audit report to:
-c:\Users\coihu12\Documents\App\.agents\teamwork\explorer_survey_3\handoff.md
-And send a completion message back with summary and handoff path.
+## Deliverables
+Write your comprehensive investigation report to:
+`c:\Users\coihu12\Documents\App\.agents\teamwork\explorer_survey_3\report.md`
+and write your `handoff.md`.
+Identify all affected files, line numbers, current queries vs optimized queries, build.gradle configuration, and exact implementation recommendations.
+
+## 2026-10-28T00:43:46Z
+[Message] timestamp=2026-10-28T00:43:46Z sender=e84dfd06-a5ff-437b-948f-883d103ebdc9 priority=MESSAGE_PRIORITY_HIGH content=You are explorer_survey_3.
+Your working directory is: c:\Users\coihu12\Documents\App\.agents\teamwork\explorer_survey_3\
+Read your dispatch instructions in: c:\Users\coihu12\Documents\App\.agents\teamwork\explorer_survey_3\DISPATCH.md
+Read the authoritative user request in: c:\Users\coihu12\Documents\App\.agents\teamwork\ORIGINAL_REQUEST.md (under ## 2026-10-28T00:39:16Z § R3 and § R4)
+Read the system invariants in: c:\Users\coihu12\Documents\App\AGENTS.md
+
+Your task is to thoroughly survey and investigate the codebase for Requirements R3 and R4:
+1. R3: Fix SqliteException(1) in currentMonthlyBudgetSummaryProvider (lib/features/dashboard/presentation/providers/dashboard_providers.dart) where double quotes "POSTED" are used.
+   - Audit ALL raw SQL queries across the entire codebase (customSelect, customUpdate, customStatement) for double quotes vs single quotes.
+2. R4 (Database):
+   - In currentMonthlyBudgetSummaryProvider: replace N+1 query loop with a single aggregated SQLite JOIN ... GROUP BY query.
+   - In reportsSummaryProvider: replace full-table db.select(db.journalPostings).get() memory load with bounded SQLite queries.
+3. R4 (Android build & scripts):
+   - Configure android/app/build.gradle and android/app/proguard-rules.pro with R8 code shrinking (minifyEnabled true) and resource shrinking (shrinkResources true).
+   - Check release APK build command: flutter build apk --release --split-per-abi --tree-shake-icons.
+   - Inspect Launch_DongTien_Emulator.bat and how to update it.
+   - Inspect adb install command for DongTien_Pixel_API34 emulator.
+
+Write your findings to: c:\Users\coihu12\Documents\App\.agents\teamwork\explorer_survey_3\report.md
+Write your handoff to: c:\Users\coihu12\Documents\App\.agents\teamwork\explorer_survey_3\handoff.md
+Send a completion message back to orchestrator_2 when finished.

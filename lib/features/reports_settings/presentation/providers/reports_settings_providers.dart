@@ -2,8 +2,10 @@ import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/money/vnd_money.dart';
+import '../../../../core/notifications/notification_scheduler.dart';
 import '../../../../core/security/backup_payload_models.dart';
 import '../../../../core/security/encrypted_backup_service.dart';
+import '../../../../domain/budgeting/billing_cycle_calculator.dart';
 import '../../../../domain/budgeting/category_spending_calculator.dart';
 import '../../../../domain/ledger/account_kind.dart';
 import '../../../../domain/ledger/post_transaction_command.dart';
@@ -31,82 +33,107 @@ class ReportsSummaryData {
 /// Reactive provider computing the Reports summary for the current period and Net Worth.
 final reportsSummaryProvider = FutureProvider<ReportsSummaryData>((ref) async {
   final db = ref.watch(databaseProvider);
-
-  // Watch streams so any transaction/account/setting mutation triggers recomputation
-  ref.watch(accountsWithBalancesStreamProvider);
-  ref.watch(recentTransactionsStreamProvider);
-  ref.watch(settingsStreamProvider);
+  final settingsAsync = ref.watch(settingsStreamProvider);
+  final periodStartDay =
+      (settingsAsync.value?.periodStartDay ?? 1).clamp(1, 28);
 
   final now = DateTime.now();
-  final periodMonth = '${now.year}-${now.month.toString().padLeft(2, '0')}';
-  final startOfMonthMs =
-      DateTime(now.year, now.month, 1).millisecondsSinceEpoch;
-  final endOfMonthMs = DateTime(now.year, now.month + 1, 0, 23, 59, 59, 999)
-      .millisecondsSinceEpoch;
+  final cycle = BillingCycleCalculator.calculate(now, periodStartDay);
 
-  final categories = await db.select(db.categories).get();
-  final postedTxs = await (db.select(db.journalTransactions)
-        ..where((t) =>
-            t.status.equals('POSTED') &
-            t.txType.isNotValue('REVERSAL') &
-            t.occurredAt.isBetweenValues(startOfMonthMs, endOfMonthMs)))
+  final startMs = cycle.cycleStart.millisecondsSinceEpoch;
+  final endMs = cycle.cycleEndInclusive.millisecondsSinceEpoch;
+
+  final dateVars = [
+    Variable.withInt(startMs),
+    Variable.withInt(endMs),
+  ];
+
+  final periodMonth = cycle.isCalendarMonth
+      ? '${now.year}-${now.month.toString().padLeft(2, '0')}'
+      : '${cycle.cycleStart.year}-${cycle.cycleStart.month.toString().padLeft(2, '0')} (${cycle.formatCycleRange()})';
+
+  // 1. Bounded recognized income query
+  final incomeRow = await db
+      .customSelect(
+        '''
+    SELECT COALESCE(SUM(p.credit_vnd - p.debit_vnd), 0) AS total_income
+    FROM journal_postings p
+    JOIN journal_transactions t ON p.transaction_id = t.id
+    JOIN ledger_accounts a ON p.account_id = a.id
+    WHERE t.status = 'POSTED'
+      AND t.tx_type = 'INCOME'
+      AND t.occurred_at >= ? AND t.occurred_at <= ?
+      AND a.kind = 'INCOME'
+    ''',
+        variables: dateVars,
+        readsFrom: {
+          db.journalPostings,
+          db.journalTransactions,
+          db.ledgerAccounts
+        },
+      )
+      .getSingle();
+  final recognizedIncomeVnd = incomeRow.read<int>('total_income');
+
+  // 2. Bounded internal transfers query
+  final transfersRow = await db
+      .customSelect(
+        '''
+    SELECT COALESCE(SUM(p.debit_vnd), 0) AS total_transfers
+    FROM journal_postings p
+    JOIN journal_transactions t ON p.transaction_id = t.id
+    WHERE t.status = 'POSTED'
+      AND t.tx_type IN ('TRANSFER', 'CREDIT_CARD_PAYMENT')
+      AND t.occurred_at >= ? AND t.occurred_at <= ?
+      AND p.debit_vnd > 0
+    ''',
+        variables: dateVars,
+        readsFrom: {db.journalPostings, db.journalTransactions},
+      )
+      .getSingle();
+  final internalTransfersVnd = transfersRow.read<int>('total_transfers');
+
+  // 3. Bounded category spending query
+  final catSpendingRows = await db
+      .customSelect(
+        '''
+    SELECT 
+      c.id AS category_id,
+      c.name AS category_name,
+      COALESCE(SUM(p.debit_vnd), 0) AS gross_expense,
+      COALESCE(SUM(p.credit_vnd), 0) AS refund_credits
+    FROM categories c
+    JOIN journal_postings p ON c.id = p.category_id
+    JOIN journal_transactions t ON p.transaction_id = t.id
+    JOIN ledger_accounts a ON p.account_id = a.id
+    WHERE t.status = 'POSTED'
+      AND t.tx_type != 'REVERSAL'
+      AND t.occurred_at >= ? AND t.occurred_at <= ?
+      AND a.kind = 'EXPENSE'
+      AND c.kind = 'EXPENSE'
+      AND c.is_archived = 0
+    GROUP BY c.id, c.name
+    HAVING gross_expense > 0 OR refund_credits > 0
+    ORDER BY c.id ASC
+    ''',
+        variables: dateVars,
+        readsFrom: {
+          db.categories,
+          db.journalPostings,
+          db.journalTransactions,
+          db.ledgerAccounts
+        },
+      )
       .get();
 
-  final txById = {for (final tx in postedTxs) tx.id: tx};
-  final allPostings = await db.select(db.journalPostings).get();
-  final accounts = await db.select(db.ledgerAccounts).get();
-  final accountKindById = {for (final a in accounts) a.id: a.kind};
-
-  int recognizedIncomeVnd = 0;
-  int internalTransfersVnd = 0;
-  final grossByCategory = <int, int>{};
-  final refundByCategory = <int, int>{};
-
-  for (final tx in postedTxs) {
-    if (tx.txType == 'TRANSFER' || tx.txType == 'CREDIT_CARD_PAYMENT') {
-      final txPostings =
-          allPostings.where((p) => p.transactionId == tx.id && p.debitVnd > 0);
-      for (final p in txPostings) {
-        internalTransfersVnd += p.debitVnd;
-      }
-    }
-  }
-
-  for (final p in allPostings) {
-    final tx = txById[p.transactionId];
-    if (tx == null) continue;
-
-    final accKind = accountKindById[p.accountId];
-    if (accKind == 'INCOME' && tx.txType == 'INCOME') {
-      recognizedIncomeVnd += (p.creditVnd - p.debitVnd);
-    } else if (accKind == 'EXPENSE' && p.categoryId != null) {
-      final catId = p.categoryId!;
-      if (p.debitVnd > 0) {
-        grossByCategory[catId] = (grossByCategory[catId] ?? 0) + p.debitVnd;
-      }
-      if (p.creditVnd > 0) {
-        refundByCategory[catId] = (refundByCategory[catId] ?? 0) + p.creditVnd;
-      }
-    }
-  }
-
-  final expenseCategories =
-      categories.where((c) => c.kind == 'EXPENSE' && !c.isArchived).toList();
-  final categoryItems = <CategorySpendingItem>[];
-  for (final cat in expenseCategories) {
-    final gross = grossByCategory[cat.id] ?? 0;
-    final refund = refundByCategory[cat.id] ?? 0;
-    if (gross > 0 || refund > 0) {
-      categoryItems.add(
-        CategorySpendingItem(
-          categoryId: cat.id,
-          categoryName: cat.name,
-          grossExpense: VndMoney(gross),
-          refundCredits: VndMoney(refund),
-        ),
-      );
-    }
-  }
+  final categoryItems = catSpendingRows.map((r) {
+    return CategorySpendingItem(
+      categoryId: r.read<int>('category_id'),
+      categoryName: r.read<String>('category_name'),
+      grossExpense: VndMoney(r.read<int>('gross_expense')),
+      refundCredits: VndMoney(r.read<int>('refund_credits')),
+    );
+  }).toList();
 
   final spendingReport = CategorySpendingCalculator.calculate(
     categoryItems: categoryItems,
@@ -172,6 +199,7 @@ class ReportsSettingsController extends AutoDisposeAsyncNotifier<void> {
       );
       ref.invalidate(settingsStreamProvider);
       ref.invalidate(reportsSummaryProvider);
+      ref.invalidate(currentMonthlyBudgetSummaryProvider);
     });
   }
 
@@ -184,6 +212,14 @@ class ReportsSettingsController extends AutoDisposeAsyncNotifier<void> {
         ),
       );
       ref.invalidate(settingsStreamProvider);
+
+      final scheduler = ref.read(notificationSchedulerProvider);
+      if (enabled) {
+        await scheduler.initialize();
+        await scheduler.reconcileFromDatabase(_db);
+      } else {
+        await scheduler.cancelAll();
+      }
     });
   }
 

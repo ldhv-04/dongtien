@@ -1,13 +1,20 @@
-# BRIEFING — 2026-10-27T19:53:00Z
+# BRIEFING — 2026-10-28T18:38:40Z
 
 ## Mission
-Coordinate and monitor the complete implementation and verification of DongTien, an offline-first Android personal finance Flutter application.
+Coordinate and monitor the fix of the three critical bugs in Đồng Tiền (vn.dongtien):
+1. R1: Scheduled obligations vs category budgets & envelopes conflict resolution (Option B)
+2. R2: Unified Edit & Delete across all items on Financial Plans screen with atomic ledger reversals
+3. R3: Custom billing cycle (periodStartDay) synchronization across Dashboard, Plans, Notifications, and Reports
+4. R4: Full automated test suite verification and updated release split APK build
 
 ## 🔒 My Identity
 - Archetype: sentinel
 - Working directory: c:\Users\coihu12\Documents\App\.agents\teamwork\sentinel_1
-- Orchestrator: 4b707e3a-5355-44d8-b48d-d32bbd3220b1
-- Victory Auditor: [to be spawned on victory claim]
+- Orchestrator: e84dfd06-a5ff-437b-948f-883d103ebdc9
+- Victory Auditor: 17d8ac5d-a58c-48a6-b35b-77bdc2625c66
+- Active Orchestrator: b3a0cd18-f6b1-42d4-9173-c648bf560f2f (orchestrator_3)
+- Cron 1 Task ID: task-20
+- Cron 2 Task ID: task-22
 
 ## 🔒 Key Constraints
 - No technical decisions — relay only
@@ -15,16 +22,17 @@ Coordinate and monitor the complete implementation and verification of DongTien,
 - Keep context ultra-light
 
 ## User Context
-- **Last user request**: Build DongTien production-ready Flutter app with double-entry ledger, envelope decoupling, Safe-to-Spend, M3 UI, encrypted backup/restore, and 15 automated scenarios.
+- **Last user request**: Fix 3 critical functional bugs (R1: obligation vs budget conflict, R2: full Edit/Delete on Plans with ledger reversal, R3: periodStartDay sync across app) and produce updated release APKs.
 - **Pending clarifications**: none
-- **Delivered results**: Phase 0 (Lean docs) & Phase 1 (Scaffold, VndMoney, 9 Drift tables) & Phase 2 (Pure domain engines, DAOs, 253 tests) verified and sealed.
+- **Delivered results**: Dispatched Project Orchestrator (orchestrator_3, id: b3a0cd18-f6b1-42d4-9173-c648bf560f2f). Scheduled reporting and liveness crons.
 
 ## Project Status
-- **Phase**: in progress (Phase 3 / Milestone M3: Material 3 UI Feature Slices & Shell)
-- **Active Orchestrator**: 4b707e3a-5355-44d8-b48d-d32bbd3220b1 (teamwork_preview_orchestrator)
-- **Routing Decision**: General path (`teamwork_preview_orchestrator`) — full SWE multi-phase application build.
-- **Cron 1 (Progress Reporting)**: c014782d-da86-4fd6-bfaf-0711ee79652f/task-12 (*/8 * * * *)
-- **Cron 2 (Liveness Check)**: c014782d-da86-4fd6-bfaf-0711ee79652f/task-14 (*/10 * * * *)
+- **Phase**: in progress
+- **Active Orchestrator**: b3a0cd18-f6b1-42d4-9173-c648bf560f2f (orchestrator_3)
+- **Victory Auditor**: pending victory claim
+- **Routing Decision**: General path (`teamwork_preview_orchestrator`)
+- **Cron 1 (Progress Reporting)**: active (task-20, */8 * * * *)
+- **Cron 2 (Liveness Check)**: active (task-22, */10 * * * *)
 
 ## Victory Audit Status
 - **Triggered**: no
@@ -32,7 +40,9 @@ Coordinate and monitor the complete implementation and verification of DongTien,
 - **Retry count**: 0
 
 ## Artifact Index
-- c:\Users\coihu12\Documents\App\.agents\teamwork\ORIGINAL_REQUEST.md — Authoritative user request
+- c:\Users\coihu12\Documents\App\.agents\teamwork\ORIGINAL_REQUEST.md — Authoritative user requests
 - c:\Users\coihu12\Documents\App\AGENTS.md — System invariants & file ownership
 - c:\Users\coihu12\Documents\App\docs\ARCHITECTURE_AND_RULES.md — Architectural rules & ADRs
 - c:\Users\coihu12\Documents\App\docs\DESIGN_AND_TEST_PLAN.md — Design tokens & acceptance test matrix
+- c:\Users\coihu12\Documents\App\.agents\teamwork\orchestrator_3\plan.md — Orchestrator plan
+- c:\Users\coihu12\Documents\App\.agents\teamwork\orchestrator_3\progress.md — Orchestrator progress log

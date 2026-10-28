@@ -11,12 +11,16 @@ class CustomKeypad extends StatelessWidget {
   final ValueChanged<int> onDigitPressed;
   final VoidCallback onBackspacePressed;
   final VoidCallback onDonePressed;
+  final bool isSubmitting;
+  final bool? isDoneEnabled;
 
   const CustomKeypad({
     super.key,
     required this.onDigitPressed,
     required this.onBackspacePressed,
     required this.onDonePressed,
+    this.isSubmitting = false,
+    this.isDoneEnabled,
   });
 
   @override
@@ -64,6 +68,7 @@ class CustomKeypad extends StatelessWidget {
   }
 
   Widget _buildBottomRow() {
+    final bool doneActive = !isSubmitting && (isDoneEnabled ?? true);
     return Row(
       children: [
         // Done button
@@ -75,10 +80,13 @@ class CustomKeypad extends StatelessWidget {
               icon: Icons.check,
               label: 'Xong',
               isAction: true,
-              onTap: () {
-                HapticFeedback.mediumImpact();
-                onDonePressed();
-              },
+              isEnabled: doneActive,
+              onTap: doneActive
+                  ? () {
+                      HapticFeedback.mediumImpact();
+                      onDonePressed();
+                    }
+                  : null,
             ),
           ),
         ),
@@ -121,13 +129,15 @@ class _KeypadButton extends StatelessWidget {
   final String? label;
   final IconData? icon;
   final bool isAction;
-  final VoidCallback onTap;
+  final bool isEnabled;
+  final VoidCallback? onTap;
 
   const _KeypadButton({
     required this.semanticId,
     this.label,
     this.icon,
     this.isAction = false,
+    this.isEnabled = true,
     required this.onTap,
   });
 
@@ -136,45 +146,55 @@ class _KeypadButton extends StatelessWidget {
     return Semantics(
       identifier: semanticId,
       button: true,
+      enabled: isEnabled,
       child: Material(
         color: isAction
-            ? AppColors.surfaceAccentVerdantSecondary
+            ? (isEnabled
+                ? AppColors.surfaceAccentVerdantSecondary
+                : AppColors.surfaceSecondary)
             : AppColors.surfaceSecondary,
         borderRadius: BorderRadius.circular(16.0),
         child: InkWell(
-          onTap: onTap,
+          onTap: isEnabled ? onTap : null,
           borderRadius: BorderRadius.circular(16.0),
-          child: Container(
-            constraints: const BoxConstraints(
-              minHeight: 56.0,
-              minWidth: 64.0,
-            ),
-            alignment: Alignment.center,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (icon != null) ...[
-                  Icon(
-                    icon,
-                    size: 20.0,
-                    color: isAction
-                        ? AppColors.textAccentVerdantPrimary
-                        : AppColors.iconPrimary,
-                  ),
-                  if (label != null) const SizedBox(width: 4.0),
-                ],
-                if (label != null)
-                  Text(
-                    label!,
-                    style: AppTypography.titleLarge.copyWith(
+          child: Opacity(
+            opacity: isEnabled ? 1.0 : 0.4,
+            child: Container(
+              constraints: const BoxConstraints(
+                minHeight: 56.0,
+                minWidth: 64.0,
+              ),
+              alignment: Alignment.center,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (icon != null) ...[
+                    Icon(
+                      icon,
+                      size: 20.0,
                       color: isAction
-                          ? AppColors.textAccentVerdantPrimary
-                          : AppColors.textPrimary,
-                      fontWeight: FontWeight.w600,
+                          ? (isEnabled
+                              ? AppColors.textAccentVerdantPrimary
+                              : AppColors.textTertiary)
+                          : AppColors.iconPrimary,
                     ),
-                  ),
-              ],
+                    if (label != null) const SizedBox(width: 4.0),
+                  ],
+                  if (label != null)
+                    Text(
+                      label!,
+                      style: AppTypography.titleLarge.copyWith(
+                        color: isAction
+                            ? (isEnabled
+                                ? AppColors.textAccentVerdantPrimary
+                                : AppColors.textTertiary)
+                            : AppColors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),

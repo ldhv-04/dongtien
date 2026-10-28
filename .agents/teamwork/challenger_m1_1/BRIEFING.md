@@ -1,7 +1,7 @@
-# BRIEFING — 2026-10-27T18:18:00Z
+# BRIEFING — 2026-10-28T01:10:00Z
 
 ## Mission
-Adversarial empirical stress-testing of Milestone M1 Money & Integer Arithmetic engine (VndMoney, VndFormatter, and parser).
+Adversarial empirical stress-testing of Milestone M1 SQL logic, edge conditions, boundary timestamps, void/superseded handling, and reactive emissions for `currentMonthlyBudgetSummaryProvider` and `reportsSummaryProvider`.
 
 ## 🔒 My Identity
 - Archetype: challenger
@@ -10,6 +10,8 @@ Adversarial empirical stress-testing of Milestone M1 Money & Integer Arithmetic 
 - Original parent: 4b707e3a-5355-44d8-b48d-d32bbd3220b1
 - Milestone: M1
 - Instance: 1 of 1
+- Current parent: e84dfd06-a5ff-437b-948f-883d103ebdc9
+- Current scope: M1 SQL logic stress testing (edge conditions, zero budgets, refund credits > gross expense, voided/superseded records, month boundaries)
 
 ## 🔒 Key Constraints
 - Review-only — do NOT modify implementation code
@@ -17,50 +19,46 @@ Adversarial empirical stress-testing of Milestone M1 Money & Integer Arithmetic 
 - Empirical Challenger: must write and run verification tests directly, reproduce all bugs empirically
 
 ## Current Parent
-- Conversation ID: 4b707e3a-5355-44d8-b48d-d32bbd3220b1
-- Updated: not yet
+- Conversation ID: e84dfd06-a5ff-437b-948f-883d103ebdc9
+- Updated: 2026-10-28T01:06:11Z
 
 ## Review Scope
 - **Files to review**:
-  - `lib/core/money/vnd_money.dart`
-  - `lib/core/money/vnd_formatter.dart`
-  - `test/unit/vnd_money_test.dart`
-- **Interface contracts**: `AGENTS.md`, `build_spec/dongtien_build_spec.md`, `docs/ARCHITECTURE_AND_RULES.md`
+  - `lib/features/dashboard/presentation/providers/dashboard_providers.dart` (`currentMonthlyBudgetSummaryProvider`)
+  - `lib/features/reports_settings/presentation/providers/reports_settings_providers.dart` (`reportsSummaryProvider`)
+- **Interface contracts**: `PROJECT.md`, `AGENTS.md`, `build_spec/dongtien_build_spec.md`, `docs/ARCHITECTURE_AND_RULES.md`
 - **Review criteria**:
-  - 64-bit overflow guard: exactly ±9_000_000_000_000_000 allowed, ±9_000_000_000_000_001 throws VndOverflowException
-  - Arithmetic edge cases: add, sub, mul, div, ceiling/floor div, div by zero
-  - Formatter edge cases: 0 ₫, negative amounts (-1.250.000 ₫), multi-trillion amounts, tabular figures
-  - Text parsing edge cases: dirty input, dot vs comma, spaces, non-numeric strings
+  - Single aggregated query in `currentMonthlyBudgetSummaryProvider` eliminating N+1
+  - Single-quoted string literals `'POSTED'`, `'REVERSAL'` eliminating `SqliteException(1)`
+  - Bounded queries in `reportsSummaryProvider` eliminating full-table scans
+  - Edge cases: zero budgets, categories with zero spending, multiple refunds exceeding gross expense, voided and superseded transactions, month boundary timestamps
+  - Continuous reactive emissions on database mutations
 
 ## Key Decisions Made
-- Executed baseline tests `test/unit/vnd_money_test.dart` (30/30 passed).
-- Built adversarial test harness in `test/unit/vnd_money_adversarial_test.dart` with 28 comprehensive edge cases.
-- Empirically confirmed 2 bugs in `VndFormatter`:
-  1. Multiple consecutive signs (`--1000`, `++1000`, `+-1000`, `- - 1000`) accepted and `--1000` evaluates to positive 1000.
-  2. `VndFormatter.parse()` throws `FormatException` instead of `VndOverflowException` on overflow, violating public contract.
-- Issued verdict: `REQUEST_CHANGES` with exact reproducible test suite and proposed minimal patch for `worker_m1_1`.
+- Audited implementation code of `currentMonthlyBudgetSummaryProvider` and `reportsSummaryProvider`.
+- Verified SQL queries, joins, group by, coalesce, and date boundary predicates.
+- Identified test matrix covering 6 crucial dimensions: zero budgets, zero category spending, excess refunds, audit voiding/superseding, month boundary precision, and reactive stream triggers.
+- Writing dedicated empirical challenge test suite `test/database/m1_sql_edge_conditions_challenge_test.dart`.
 
 ## Artifact Index
-- `BRIEFING.md` — Agent working memory
-- `progress.md` — Liveness and step tracking
+- `BRIEFING.md` — Persistent working memory
+- `progress.md` — Liveness heartbeat and step tracking
 - `DISPATCH.md` — Inbound instructions log
 - `handoff.md` — Final challenge report and verdict
-- `test/unit/vnd_money_adversarial_test.dart` — Empirical adversarial test harness
+- `test/database/m1_sql_edge_conditions_challenge_test.dart` — Adversarial SQL edge cases verification suite
 
 ## Attack Surface
 - **Hypotheses tested**:
-  - Boundary limits: ±9_000_000_000_000_000 (PASSED)
-  - Boundary overflow: ±9_000_000_000_000_001 (PASSED)
-  - Int64 max/min multiplication overflow (PASSED)
-  - Division by zero exception (PASSED)
-  - Multi-trillion formatting (PASSED)
-  - Tabular figure text styling (PASSED)
-  - Consecutive sign parsing (FAILED - BUG REPRODUCED)
-  - Parse overflow exception type (FAILED - BUG REPRODUCED)
+  - Zero budgets configured for current month returns empty list without error
+  - Categories with zero spending yield 0 ₫ spent and full remaining limit
+  - Multiple refunds exceeding gross expense evaluate to zero effective spent and negative net expense in reports
+  - Voided and superseded transactions (and their audit reversals) are strictly excluded from spending aggregates
+  - Timestamps exactly at month boundaries (startOfMonthMs, startOfMonthMs - 1, endOfMonthMs, endOfMonthMs + 1) are precisely partitioned
+  - Real-time mutations to categories, budgets, and transactions immediately trigger reactive provider re-emission
 - **Vulnerabilities found**:
-  - BUG-M1-01: `VndFormatter.tryParse` parses `--1000` as positive `1000`.
-  - BUG-M1-02: `VndFormatter.parse` fails to throw `VndOverflowException` on out-of-range strings.
-- **Untested angles**: All specified angles empirically verified.
+  - In progress of empirical execution
+- **Untested angles**:
+  - Multi-year wrap-around boundary cases
 
 ## Loaded Skills
 - None specified

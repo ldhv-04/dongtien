@@ -1,7 +1,7 @@
-# BRIEFING — 2026-10-28T01:14:30Z
+# BRIEFING — 2026-10-28T01:12:00Z
 
 ## Mission
-Independent quality and adversarial review of Milestone M1 (Drift Database Schema, Migrations, Vietnamese Seeding, and Database Invariant Tests).
+Independent quality and adversarial review of Milestone M1 changes in `dashboard_providers.dart` (F1 SqliteException(1) fix, F2 single aggregated query) and `reports_settings_providers.dart` (F3 bounded queries replacing full-table memory load).
 
 ## 🔒 My Identity
 - Archetype: reviewer_and_adversarial_critic
@@ -10,47 +10,51 @@ Independent quality and adversarial review of Milestone M1 (Drift Database Schem
 - Original parent: 4b707e3a-5355-44d8-b48d-d32bbd3220b1
 - Milestone: M1
 - Instance: 2 of 2 (reviewer)
+- Subagent Parent: e84dfd06-a5ff-437b-948f-883d103ebdc9
 
 ## 🔒 Key Constraints
 - Review-only — do NOT modify implementation code
 - Active integrity checking: detect hardcoded results, facades, shortcuts, fake verification
 - Verdict must be APPROVE or REQUEST_CHANGES
+- Strict zero-floating point VND integer invariant
+- Offline-first and clean architecture boundaries
 
 ## Current Parent
-- Conversation ID: 4b707e3a-5355-44d8-b48d-d32bbd3220b1
-- Updated: 2026-10-28T01:14:30Z
+- Conversation ID: e84dfd06-a5ff-437b-948f-883d103ebdc9
+- Updated: 2026-10-28T01:12:00Z
 
 ## Review Scope
 - **Files to review**:
-  - `lib/core/database/app_database.dart`
-  - `lib/core/database/app_database.g.dart`
-  - `test/database/app_database_test.dart`
-- **Interface contracts**: `docs/ARCHITECTURE_AND_RULES.md`, `AGENTS.md`, `build_spec/dongtien_build_spec.md`, `.agents/teamwork/orchestrator_1/PROJECT.md`
-- **Review criteria**: Schema completeness (9 tables, check constraints, unique indexes, anchor days), Foreign keys & integrity (`PRAGMA foreign_keys = ON;`, cascade rules, self-referencing FK), Vietnamese default seeding (3 system accounts, 8 categories, 0 initial balance, zero fake transactions), test execution and verification.
+  - `lib/features/dashboard/presentation/providers/dashboard_providers.dart`
+  - `lib/features/reports_settings/presentation/providers/reports_settings_providers.dart`
+- **Interface contracts**: `PROJECT.md`, `AGENTS.md`, `build_spec/dongtien_build_spec.md`, `ORIGINAL_REQUEST.md` (R3, R4)
+- **Review criteria**:
+  1. Fix `SqliteException(1)` by using single-quoted `'POSTED'` and `'REVERSAL'`.
+  2. Eliminate N+1 loop in `currentMonthlyBudgetSummaryProvider` via single aggregated SQLite `JOIN ... GROUP BY` query with comprehensive `readsFrom` table subscriptions.
+  3. Eliminate full-table `db.select(db.journalPostings).get()` scan in `reportsSummaryProvider` using 3 bounded, index-optimized SQLite queries.
+  4. Ensure integer 64-bit VND arithmetic without floats, layer compliance, and zero regression across 275 tests.
 
 ## Review Checklist
 - **Items reviewed**:
-  - `lib/core/database/app_database.dart`: Verified all 9 tables, custom constraints, indexes, migration, seeding.
-  - `lib/core/database/app_database.g.dart`: Verified generated code, builds with zero issues.
-  - `test/database/app_database_test.dart`: Verified 14 tests pass.
-  - `test/database/adversarial_schema_test.dart`: Verified 44 adversarial tests pass.
+  - `lib/features/dashboard/presentation/providers/dashboard_providers.dart`: Lines 86–167 reviewed. Confirmed single aggregated SQL query, correct single quotes, exclusion of reversals, `readsFrom` containing all 4 relevant tables, synchronous `map`.
+  - `lib/features/reports_settings/presentation/providers/reports_settings_providers.dart`: Lines 47–139 reviewed. Confirmed 3 bounded queries for income, transfers, and category expenses; direct SQLite aggregation; zero full-table scan.
+  - `test/database/adversarial_query_optimization_test.dart` and `test/database/m1_provider_adversarial_verification_test.dart`: Confirmed comprehensive coverage including EXPLAIN QUERY PLAN, index utilization, reactive updates, and execution benchmarks.
 - **Verdict**: APPROVE
-- **Unverified claims**: None. All worker claims independently verified and confirmed.
+- **Unverified claims**: None. All worker claims independently reproduced and verified.
 
 ## Attack Surface
 - **Hypotheses tested**:
-  - Invalid posting constraints (negative debit/credit, zero/zero, two-sided): Confirmed rejected by SQLite CHECK.
-  - Foreign key violations (dangling account, category, transaction): Confirmed rejected by SQLite PRAGMA FK.
-  - Settings singleton bypass (insert id=2, duplicate id=1): Confirmed rejected.
-  - Idempotency key duplicate non-null vs duplicate null: Confirmed unique non-null enforced, null allowed.
-  - Composite unique on category_budgets: Confirmed duplicate (cat, month) rejected.
-  - Seeding 0 ₫ dynamic balance: Confirmed empty journal produces 0 ₫ without fake records.
+  - `SQLITE_DQS=0` compliance: Confirmed all SQL string literals use ANSI single quotes `'POSTED'` and `'REVERSAL'`.
+  - N+1 query waterfall: Replaced with 1 single query using `LEFT JOIN` and subquery grouping.
+  - Unbounded memory consumption: Replaced full-table `journal_postings` scan with 3 bounded SQLite queries constrained by `occurred_at >= ? AND occurred_at <= ?`.
+  - Reactive stream subscription: Added `{db.categoryBudgets, db.categories, db.journalPostings, db.journalTransactions}` to `readsFrom` so mutations in postings trigger budget card updates.
+  - Reversal isolation: Both providers explicitly exclude `tx_type = 'REVERSAL'`.
 - **Vulnerabilities found**: None.
-- **Untested angles**: None within M1 schema scope. Multi-posting atomic ledger balance verification will be handled in M2 posting service.
+- **Untested angles**: None within M1 provider query scope.
 
 ## Key Decisions Made
 - Confirmed full compliance with M1 requirements and integrity standards.
 - Issued verdict: APPROVE.
 
 ## Artifact Index
-- `c:\Users\coihu12\Documents\App\.agents\teamwork\reviewer_m1_2\handoff.md` — Review report & verdict
+- `c:\Users\coihu12\Documents\App\.agents\teamwork\reviewer_m1_2\handoff.md` — Authoritative review report & verdict

@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/database/app_database.dart';
+import '../../../../core/notifications/notification_scheduler.dart';
 import '../../../../domain/ledger/post_transaction_command.dart';
 import '../../../dashboard/presentation/providers/dashboard_providers.dart';
 
@@ -28,6 +29,16 @@ class TransactionController extends AsyncNotifier<void> {
       }
 
       final txId = await dao.postTransactionCommand(command);
+
+      final catIds = command.postings
+          .where((p) => p.categoryId != null && p.debitVnd > 0)
+          .map((p) => p.categoryId!)
+          .toSet();
+      final scheduler = ref.read(notificationSchedulerProvider);
+      for (final catId in catIds) {
+        await scheduler.checkCategoryBudgetAlert(db: db, categoryId: catId);
+      }
+
       state = const AsyncValue.data(null);
       return txId;
     } catch (e, st) {
@@ -67,6 +78,17 @@ class TransactionController extends AsyncNotifier<void> {
         linkedEnvelopeId: newCommand.linkedEnvelopeId,
         envelopeMovementType: newCommand.envelopeMovementType,
       );
+
+      final db = ref.read(databaseProvider);
+      final catIds = newCommand.postings
+          .where((p) => p.categoryId != null && p.debitVnd > 0)
+          .map((p) => p.categoryId!)
+          .toSet();
+      final scheduler = ref.read(notificationSchedulerProvider);
+      for (final catId in catIds) {
+        await scheduler.checkCategoryBudgetAlert(db: db, categoryId: catId);
+      }
+
       state = const AsyncValue.data(null);
       return newTxId;
     } catch (e, st) {

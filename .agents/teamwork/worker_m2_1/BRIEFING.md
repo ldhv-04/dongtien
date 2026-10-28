@@ -1,70 +1,43 @@
-# BRIEFING — 2026-10-27T19:12:40Z
+# BRIEFING — 2026-10-28T18:50:00Z
 
 ## Mission
-Implement pure Dart domain engines (ledger, envelopes, budgeting, forecasting) and Drift DAOs (ledger_dao, envelope_dao) with complete invariant verification and unit/database tests.
+Lead Implementation Worker for Project Đồng Tiền: Implement R1 (Obligations isolation & category selection), R2 (Financial Plans CRUD symmetry & atomic ledger reversals), and R3 (BillingCycleCalculator single source of truth across providers & UI).
 
 ## 🔒 My Identity
-- Archetype: implementer
-- Roles: implementer, qa
+- Archetype: worker
+- Roles: implementer, qa, specialist
 - Working directory: c:\Users\coihu12\Documents\App\.agents\teamwork\worker_m2_1
-- Original parent: 4b707e3a-5355-44d8-b48d-d32bbd3220b1
-- Milestone: M2 - Core Domain & DAOs
+- Original parent: b3a0cd18-f6b1-42d4-9173-c648bf560f2f
+- Milestone: m2_1 Lead Implementation
 
 ## 🔒 Key Constraints
-- Pure Dart domain in `lib/domain/` with ZERO imports from Flutter, Drift, or Riverpod.
-- Integer VND 64-bit (`VndMoney`), no floats, 9 quadrillion VND overflow guard.
-- Double-entry general ledger: SUM(debit) == SUM(credit) in atomic SQLite transactions.
-- Envelopes decoupled from General Ledger (virtual movements never generate GL postings).
-- Dynamic balance derivation: Asset/Expense = Debit - Credit; Liability/Income/Equity = Credit - Debit. No cached balance columns.
-- Audit-preserving reversals (reversals never hard-delete, status = 'POSTED', tx_type != 'REVERSAL' filter for clean UI).
-- Ceil integer division for goals: `((T - C) + N - 1) ~/ N`.
-- Safe-to-Spend: Chronological envelope allocation to pending bills, zero double-counting, exact negative integer VND on deficit with breakdown model.
-- Drift-free month-end recurrence: `min(anchor_day, daysInMonth(Y, M))`.
-- No cheats, no dummy implementations, real state and calculations.
+- DO NOT CHEAT: Genuine implementation, no hardcoding, no facades, no skipping logic.
+- Pure domain for `billing_cycle_calculator.dart`: zero Flutter/Drift imports.
+- Strict double-entry ledger invariants: atomic reversals, balanced transactions.
+- Offline-first: zero remote dependencies, zero floating-point currency (int 64-bit VND).
+- Tabular figures on all numbers, percentages, dates: `fontFeatures: [FontFeature.tabularFigures()]`.
+- Semantics identifiers on all action buttons and cards.
+- Format (`dart format`), Lint (`flutter analyze`), Test (`flutter test`), Build APK (`flutter build apk --release --split-per-abi --tree-shake-icons`).
 
 ## Current Parent
-- Conversation ID: 4b707e3a-5355-44d8-b48d-d32bbd3220b1
-- Updated: 2026-10-27T18:59:25Z
+- Conversation ID: b3a0cd18-f6b1-42d4-9173-c648bf560f2f
+- Updated: 2026-10-28T18:50:00Z
 
 ## Task Summary
-- **What to build**: Domain logic (`lib/domain/ledger/`, `lib/domain/envelopes/`, `lib/domain/budgeting/`, `lib/domain/forecasting/`), Drift DAOs (`lib/core/database/daos/ledger_dao.dart`, `envelope_dao.dart`), and comprehensive tests (`test/unit/`, `test/database/`).
-- **Success criteria**: 100% test pass on `flutter test`, `flutter analyze` 0 warnings/errors, `dart format` clean, and comprehensive handoff report.
-- **Interface contracts**: `docs/ARCHITECTURE_AND_RULES.md`, `AGENTS.md`.
-- **Code layout**: Clean Architecture, domain is pure Dart, DAOs encapsulate Drift queries.
+- **What to build**:
+  1. `lib/domain/budgeting/billing_cycle_calculator.dart` & `MonthlyBudgetSummary.cycleLabel`.
+  2. `plans_providers.dart` (R1 category isolation, R2 CRUD + atomic reversals, R3 billing cycle sync).
+  3. UI updates in `obligations_forecast_view.dart`, `category_budgets_view.dart`, `savings_goals_view.dart`, `upcoming_obligations_card.dart`, `spending_vs_budget_card.dart`.
+  4. Provider updates in `dashboard_providers.dart`, `safe_to_spend_provider.dart`, `reports_settings_providers.dart`, `notification_scheduler.dart`.
+  5. Comprehensive automated test suite (unit + widget) covering R1, R2, R3.
+  6. Static analysis, formatting, tests passing 100%, and release APK builds.
+- **Success criteria**: All gates pass, zero analyzer issues, all tests pass, valid APKs generated.
 
 ## Key Decisions Made
-- Implemented pure Dart domain modules without any external dependencies or Flutter imports.
-- Kept `lib/core/money/vnd_money.dart` using `@immutable` and pure integer VND logic.
-- Implemented all 7 transaction types (9 execution patterns) via `PostingMatrix` and `PostTransactionCommand`.
-- Created Drift DAOs `LedgerDao` and `EnvelopeDao` with full reactive streams and atomic transactions.
-- Registered DAOs on `AppDatabase` and executed `build_runner` generating 96 outputs.
-- Authored 9 test suites covering 192 total tests.
+- Follow blueprints from explorer handoffs m1_1, m1_2, m1_3.
 
 ## Artifact Index
-- `.agents/teamwork/worker_m2_1/DISPATCH.md` — Initial dispatch from orchestrator
-- `.agents/teamwork/worker_m2_1/BRIEFING.md` — Working memory and status
-- `.agents/teamwork/worker_m2_1/progress.md` — Liveness heartbeat
-- `.agents/teamwork/worker_m2_1/handoff.md` — Final handoff report
-
-## Change Tracker
-- **Files modified**:
-  - `lib/core/database/app_database.dart` (registered DAOs)
-  - `lib/core/database/app_database.g.dart` (generated by build_runner)
-- **Files created**:
-  - `lib/domain/ledger/*` (7 files)
-  - `lib/domain/envelopes/*` (4 files)
-  - `lib/domain/budgeting/*` (4 files)
-  - `lib/domain/forecasting/*` (3 files)
-  - `lib/core/database/daos/*` (4 files including generated `.g.dart`)
-  - `test/unit/*` (7 test files)
-  - `test/database/*` (2 test files)
-- **Build status**: PASS (192/192 tests pass, analyze 0 issues, format 0 issues)
-- **Pending issues**: None
-
-## Quality Status
-- **Build/test result**: 192/192 passed
-- **Lint status**: 0 warnings, 0 errors
-- **Tests added/modified**: 68 new unit & database tests added covering M2 domain & DAOs
-
-## Loaded Skills
-None
+- `.agents/teamwork/worker_m2_1/DISPATCH.md` — Initial assignment
+- `.agents/teamwork/worker_m2_1/BRIEFING.md` — Persistent state
+- `.agents/teamwork/worker_m2_1/progress.md` — Liveness & progress tracking
+- `.agents/teamwork/worker_m2_1/handoff.md` — Comprehensive handoff report

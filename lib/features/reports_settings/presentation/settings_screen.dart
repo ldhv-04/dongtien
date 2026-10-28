@@ -18,8 +18,19 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final TextEditingController _bufferCtrl = TextEditingController();
-  final NotificationScheduler _scheduler = NotificationScheduler();
   bool _permissionDeniedBanner = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final scheduler = ref.read(notificationSchedulerProvider);
+      if (!scheduler.isPermissionGranted) {
+        setState(() => _permissionDeniedBanner = true);
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -231,7 +242,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     .read(reportsSettingsControllerProvider.notifier)
                     .updateNotificationsEnabled(enabled);
                 if (enabled) {
-                  final granted = await _scheduler.initialize();
+                  final scheduler = ref.read(notificationSchedulerProvider);
+                  final granted = await scheduler.initialize();
                   if (mounted) {
                     setState(() {
                       _permissionDeniedBanner = !granted;
@@ -239,6 +251,49 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   }
                 }
               },
+            ),
+          ),
+          AppSpacing.gapH8,
+          Semantics(
+            identifier: 'btn_test_notification',
+            button: true,
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.notification_important_outlined),
+                label: const Text('Gửi thông báo kiểm tra ngay'),
+                onPressed: () async {
+                  final scheduler = ref.read(notificationSchedulerProvider);
+                  final granted = await scheduler.initialize();
+                  if (mounted) {
+                    setState(() {
+                      _permissionDeniedBanner = !granted;
+                    });
+                  }
+                  if (granted) {
+                    await scheduler.showTestNotification();
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content:
+                              Text('Đã gửi thông báo kiểm tra thành công!'),
+                        ),
+                      );
+                    }
+                  } else {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          backgroundColor: AppColors.surfaceAccentRubyPrimary,
+                          content: Text(
+                            'Không thể gửi: Quyền thông báo bị từ chối trên thiết bị.',
+                          ),
+                        ),
+                      );
+                    }
+                  }
+                },
+              ),
             ),
           ),
         ],

@@ -1,23 +1,55 @@
-## 2026-10-27T18:09:17Z
-You are reviewer_m1_2, working as Milestone M1 Reviewer (Drift Schema, Seeding & Tests Review).
-Your working directory is: c:\Users\coihu12\Documents\App\.agents\teamwork\reviewer_m1_2
+# Dispatch to reviewer_m1_2
 
-Read the authoritative user request at: c:\Users\coihu12\Documents\App\.agents\teamwork\ORIGINAL_REQUEST.md
-Read the build specification at: c:\Users\coihu12\Documents\App\build_spec\dongtien_build_spec.md
-Read the project scope at: c:\Users\coihu12\Documents\App\.agents\teamwork\orchestrator_1\PROJECT.md
-Read worker_m1_1 handoff report at: c:\Users\coihu12\Documents\App\.agents\teamwork\worker_m1_1\handoff.md
+## Identity & Scope
+- **Agent Name**: `reviewer_m1_2`
+- **Working Directory**: `c:\Users\coihu12\Documents\App\.agents\teamwork\reviewer_m1_2\`
+- **Milestone**: M1 (Database Bug Fixes & Query Optimization)
 
-Inspect the work products:
-- c:\Users\coihu12\Documents\App\lib\core\database\app_database.dart
-- c:\Users\coihu12\Documents\App\lib\core\database\app_database.g.dart
-- c:\Users\coihu12\Documents\App\test\database\app_database_test.dart
+## Target Files
+- `lib/features/dashboard/presentation/providers/dashboard_providers.dart`
+- `lib/features/reports_settings/presentation/providers/reports_settings_providers.dart`
 
-Review criteria:
-1. Schema Completeness: Are all 9 Drift tables implemented with full column specifications, check constraints (especially postings check `(debit_vnd > 0 AND credit_vnd == 0) OR (credit_vnd > 0 AND debit_vnd == 0)`), unique indexes (budgets), and anchor day checks?
-2. Foreign Keys & Integrity: Is `PRAGMA foreign_keys = ON;` executed in `MigrationStrategy.beforeOpen`? Are cascade rules and self-referencing FK pointers properly declared?
-3. Vietnamese Default Seeding: Are 3 system accounts (`EQUITY_OPENING`, default Income, default Expense) and 8 default Vietnamese categories seeded in `onCreate` with 0 ₫ initial balances and zero fake transactions?
-4. Run tests: Run `flutter test test/database/app_database_test.dart` to verify.
+## Inputs
+- `c:\Users\coihu12\Documents\App\.agents\teamwork\worker_m1\handoff.md`
+- `c:\Users\coihu12\Documents\App\.agents\teamwork\ORIGINAL_REQUEST.md` (## 2026-10-28T00:39:16Z § R3 and § R4)
+- `c:\Users\coihu12\Documents\App\PROJECT.md`
+- `c:\Users\coihu12\Documents\App\AGENTS.md`
 
-Deliver your review verdict (APPROVE or REQUEST_CHANGES) with detailed technical reasoning in your handoff report at:
-c:\Users\coihu12\Documents\App\.agents\teamwork\reviewer_m1_2\handoff.md
-Send a completion message back with your verdict and handoff path.
+## Toolchain Environment
+```powershell
+$env:JAVA_HOME = "C:\Users\coihu12\jdk17"
+$env:ANDROID_HOME = "C:\Users\coihu12\Android\Sdk"
+$env:Path = "C:\Users\coihu12\flutter\bin;C:\Users\coihu12\jdk17\bin;C:\Users\coihu12\Android\Sdk\platform-tools;" + $env:Path
+```
+
+## Review Criteria
+1. Independently examine correctness, completeness, robustness, and interface conformance.
+2. Verify SQL parameters, reactive stream table subscriptions (`readsFrom`), and boundary logic.
+3. Run `dart format`, `flutter analyze`, and `flutter test`.
+4. Deliver verdict (`APPROVE` or `REQUEST_CHANGES`) in `handoff.md` and message orchestrator_2.
+
+
+## 2026-10-28T01:06:11Z
+You are reviewer_m1_2.
+Your working directory is: c:\Users\coihu12\Documents\App\.agents\teamwork\reviewer_m1_2\
+Read your dispatch instructions in: c:\Users\coihu12\Documents\App\.agents\teamwork\reviewer_m1_2\DISPATCH.md
+Read the worker handoff: c:\Users\coihu12\Documents\App\.agents\teamwork\worker_m1\handoff.md
+Read the project specifications in: c:\Users\coihu12\Documents\App\PROJECT.md
+Read the system invariants in: c:\Users\coihu12\Documents\App\AGENTS.md
+Read the authoritative user request in: c:\Users\coihu12\Documents\App\.agents\teamwork\ORIGINAL_REQUEST.md
+
+Review Milestone M1 changes in:
+- lib/features/dashboard/presentation/providers/dashboard_providers.dart
+- lib/features/reports_settings/presentation/providers/reports_settings_providers.dart
+
+Toolchain setup:
+$env:JAVA_HOME = "C:\Users\coihu12\jdk17"
+$env:ANDROID_HOME = "C:\Users\coihu12\Android\Sdk"
+$env:Path = "C:\Users\coihu12\flutter\bin;C:\Users\coihu12\jdk17\bin;C:\Users\coihu12\Android\Sdk\platform-tools;" + $env:Path
+
+Run:
+dart format --output=none --set-exit-if-changed .
+flutter analyze
+flutter test
+
+Deliver verdict (APPROVE or REQUEST_CHANGES) in handoff.md and send message back to orchestrator_2.
