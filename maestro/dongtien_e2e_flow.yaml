@@ -1,0 +1,29 @@
+appId: vn.dongtien
+---
+- launchApp:
+    clearState: true
+- assertVisible: "Đồng Tiền"
+- assertVisible: "0 ₫"
+- tapOn:
+    id: "nav_tab_transactions"
+- assertVisible: "Giao dịch"
+- tapOn:
+    id: "nav_tab_funds"
+- assertVisible: "Quỹ tiền"
+- tapOn:
+    id: "nav_tab_plans"
+- assertVisible: "Kế hoạch"
+- tapOn:
+    id: "nav_tab_dashboard"
+- tapOn:
+    id: "btn_appbar_reports"
+- assertVisible: "Báo cáo tài chính"
+- assertVisible: "Chưa có thu nhập"
+- back
+- tapOn:
+    id: "btn_appbar_settings"
+- assertVisible: "Cài đặt & Sao lưu"
+- tapOn:
+    id: "btn_generate_sample_data"
+- back
+- assertVisible: "Đồng Tiền"
